@@ -101,7 +101,7 @@
 
 		const normalizedSearch = search.trim().toLowerCase();
 
-		return data.animes
+		return [...data.animes]
 			.filter((anime) => selectedStatus === 'all' || anime.status === selectedStatus)
 			.filter((anime) => {
 				if (!normalizedSearch) return true;
@@ -189,13 +189,18 @@
 			error = null;
 			data = null;
 
+			/**
+			 * Important:
+			 * Always fetch the full anime list.
+			 * Status filtering is only a frontend filter.
+			 *
+			 * If we send status=dropped to the backend, then switching
+			 * to completed/all later cannot work because those entries
+			 * were never loaded.
+			 */
 			const params = new URLSearchParams({
 				username: trimmedUsername
 			});
-
-			if (selectedStatus !== 'all') {
-				params.set('status', selectedStatus);
-			}
 
 			const response = await fetch(`/api/animes?${params.toString()}`);
 			const result = (await response.json()) as AnimeApiResponse & {
