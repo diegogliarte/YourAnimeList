@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { Anime } from '$lib/types/anime';
+	import type { RankedAnime } from '$lib/types/anime';
 
 	type Props = {
-		anime: Anime;
+		anime: RankedAnime;
 		index: number;
 		season: string | null;
 	};
@@ -13,14 +13,12 @@
 		return `https://myanimelist.net/anime/${id}`;
 	};
 
-	const formatScore = (anime: Anime) => {
-		if (!anime.customScore || anime.customScore <= 0) return '—';
-
-		return anime.displayScore;
+	const formatMean = (mean: number | null) => {
+		return mean === null ? '—' : mean.toFixed(2);
 	};
 
-	const formatEpisodes = (anime: Anime) => {
-		return `${anime.episodesWatched}/${anime.totalEpisodes ?? '?'}`;
+	const formatEpisodes = (totalEpisodes: number | null) => {
+		return totalEpisodes === null || totalEpisodes === 0 ? '?' : String(totalEpisodes);
 	};
 
 	const formatStatus = (status: string) => {
@@ -37,10 +35,10 @@
 		target="_blank"
 		rel="noreferrer"
 		aria-label={`Open ${anime.title} on MyAnimeList`}
-		class="group grid cursor-pointer grid-cols-[2.5rem_2.5rem_minmax(0,1fr)_3.25rem_2.5rem_7.5rem] items-center gap-3 px-3 py-1 transition hover:bg-white/[0.045]"
+		class="group grid cursor-pointer grid-cols-[2.5rem_2.5rem_minmax(0,1fr)_4rem_3rem_5.5rem] items-center gap-3 px-3 py-1.5 transition hover:bg-white/[0.045]"
 	>
 		<span class="text-xs tabular-nums text-neutral-600">
-			{String(index + 1).padStart(3, '0')}
+			{anime.rank ?? String(index + 1).padStart(3, '0')}
 		</span>
 
 		<div
@@ -61,21 +59,27 @@
 		</div>
 
 		<div class="min-w-0">
-			<h2 class="truncate text-xs font-medium text-neutral-100 transition group-hover:text-white">
+			<h2 class="truncate text-sm font-medium text-neutral-100 transition group-hover:text-white">
 				{anime.title}
 			</h2>
 
 			<p class="truncate text-xs text-neutral-500">
-				{formatStatus(anime.status)}
+				{#if anime.userStatus}
+					{formatStatus(anime.userStatus)}
+				{:else if anime.mediaType}
+					{formatStatus(anime.mediaType)}
+				{:else}
+					not in list
+				{/if}
 			</p>
 		</div>
 
 		<span class="text-left text-sm font-semibold tabular-nums text-accent">
-			{formatScore(anime)}
+			{formatMean(anime.mean)}
 		</span>
 
-		<span class="text-left text-sm tabular-nums text-neutral-300">
-			{formatEpisodes(anime)}
+		<span class="text-right text-sm tabular-nums text-neutral-300">
+			{formatEpisodes(anime.totalEpisodes)}
 		</span>
 
 		<span class="text-right text-sm tabular-nums text-neutral-400">

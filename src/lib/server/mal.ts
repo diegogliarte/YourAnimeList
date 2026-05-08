@@ -1,6 +1,13 @@
 import { env } from '$env/dynamic/private';
 
-import type { Anime, AnimeApiResponse, ApiAnimeStatus } from '$lib/types/anime';
+import type {
+	Anime,
+	AnimeApiResponse,
+	AnimeRankingApiResponse,
+	AnimeRankingType,
+	ApiAnimeStatus,
+	RankedAnime
+} from '$lib/types/anime';
 
 type MalAnimeNode = {
 	id: number;
@@ -10,6 +17,8 @@ type MalAnimeNode = {
 		large?: string;
 	};
 	mean?: number;
+	rank?: number;
+	popularity?: number;
 	num_episodes?: number;
 	media_type?: string;
 	status?: string;
@@ -38,7 +47,62 @@ type MalAnimeListResponse = {
 	};
 };
 
+type MalRankingEntry = {
+	node: MalAnimeNode;
+	ranking?: {
+		rank?: number;
+	};
+};
+
+type MalAnimeRankingResponse = {
+	data: MalRankingEntry[];
+	paging?: {
+		next?: string;
+	};
+};
+
 const MAL_API_BASE_URL = 'https://api.myanimelist.net/v2';
+
+const ANIME_STATUS_VALUES: ApiAnimeStatus[] = [
+	'watching',
+	'completed',
+	'on_hold',
+	'dropped',
+	'plan_to_watch'
+];
+
+const ANIME_RANKING_TYPES: AnimeRankingType[] = [
+	'all',
+	'airing',
+	'upcoming',
+	'tv',
+	'ova',
+	'movie',
+	'special',
+	'bypopularity',
+	'favorite'
+];
+
+const RANKING_PAGE_LIMIT = 500;
+const MAX_RANKING_PAGES = 4;
+
+export const isApiAnimeStatus = (value: string | null): value is ApiAnimeStatus => {
+	return ANIME_STATUS_VALUES.includes(value as ApiAnimeStatus);
+};
+
+export const isAnimeRankingType = (value: string | null): value is AnimeRankingType => {
+	return ANIME_RANKING_TYPES.includes(value as AnimeRankingType);
+};
+
+const getClientId = () => {
+	const clientId = env.MAL_CLIENT_ID?.trim();
+
+	if (!clientId) {
+		throw new Error('Missing MAL_CLIENT_ID environment variable.');
+	}
+
+	return clientId;
+};
 
 const normalizeTags = (rawTags?: string[] | string): string[] => {
 	if (!rawTags) return [];
@@ -95,10 +159,7 @@ const resolveUsername = (username: string) => {
 	};
 };
 
-const fetchAnimePage = async (
-	url: string,
-	clientId: string
-): Promise<MalAnimeListResponse> => {
+const fetchMalJson = async <T>(url: string, clientId: string): Promise<T> => {
 	const response = await fetch(url, {
 		headers: {
 			'X-MAL-CLIENT-ID': clientId
@@ -109,7 +170,21 @@ const fetchAnimePage = async (
 		throw new Error(`MyAnimeList returned ${response.status}.`);
 	}
 
-	return response.json() as Promise<MalAnimeListResponse>;
+	return response.json() as Promise<T>;
+};
+
+const fetchAnimePage = async (
+	url: string,
+	clientId: string
+): Promise<MalAnimeListResponse> => {
+	return fetchMalJson<MalAnimeListResponse>(url, clientId);
+};
+
+const fetchRankingPage = async (
+	url: string,
+	clientId: string
+): Promise<MalAnimeRankingResponse> => {
+	return fetchMalJson<MalAnimeRankingResponse>(url, clientId);
 };
 
 export const fetchUserAnimeList = async ({
@@ -119,12 +194,7 @@ export const fetchUserAnimeList = async ({
 	username: string;
 	status?: ApiAnimeStatus;
 }): Promise<AnimeApiResponse> => {
-	const clientId = env.MAL_CLIENT_ID?.trim();
-
-	if (!clientId) {
-		throw new Error('Missing MAL_CLIENT_ID environment variable.');
-	}
-
+	const clientId = getClientId();
 	const { publicUsername, malUsername } = resolveUsername(username);
 
 	const firstUrl = new URL(
@@ -195,6 +265,105 @@ export const fetchUserAnimeList = async ({
 	return {
 		username: publicUsername,
 		status: status ?? 'all',
+		count: animes.length,
+		animes
+	};
+};
+
+const fetchUserStatusMap = async (username: string): Promise<Map<number, ApiAnimeStatus>> => {
+	const userList = await fetchUserAnimeList({ username });
+	const statusMap = new Map<number, ApiAnimeStatus>();
+
+	for (const anime of userList.animes) {
+		statusMap.set(anime.id, anime.status);
+	}
+
+	return statusMap;
+};
+
+export const fetchAnimeRanking = async ({
+																					username,
+																					rankingType = 'all',
+																					excludedStatuses = ['completed'],
+																					limit = 100
+																				}: {
+	username?: string;
+	rankingType?: AnimeRankingType;
+	excludedStatuses?: ApiAnimeStatus[];
+	limit?: number;
+}): Promise<AnimeRankingApiResponse> => {
+	const clientId = getClientId();
+	const trimmedUsername = username?.trim() || null;
+	const resolvedUsername = trimmedUsername ? resolveUsername(trimmedUsername) : null;
+
+	const normalizedLimit = Math.max(1, Math.min(Math.trunc(limit), 200));
+	const uniqueExcludedStatuses = [...new Set(excludedStatuses)];
+
+	const userStatusMap =
+		resolvedUsername && uniqueExcludedStatuses.length > 0
+			? await fetchUserStatusMap(resolvedUsername.malUsername)
+			: new Map<number, ApiAnimeStatus>();
+
+	const firstUrl = new URL(`${MAL_API_BASE_URL}/anime/ranking`);
+
+	firstUrl.searchParams.set('ranking_type', rankingType);
+	firstUrl.searchParams.set('limit', String(RANKING_PAGE_LIMIT));
+	firstUrl.searchParams.set('nsfw', 'true');
+	firstUrl.searchParams.set(
+		'fields',
+		[
+			'main_picture',
+			'mean',
+			'rank',
+			'popularity',
+			'num_episodes',
+			'media_type',
+			'status',
+			'start_season'
+		].join(',')
+	);
+
+	const animes: RankedAnime[] = [];
+	let nextUrl: string | undefined = firstUrl.toString();
+	let pagesFetched = 0;
+
+	while (nextUrl && animes.length < normalizedLimit && pagesFetched < MAX_RANKING_PAGES) {
+		const page = await fetchRankingPage(nextUrl, clientId);
+
+		for (const entry of page.data) {
+			const userStatus = userStatusMap.get(entry.node.id) ?? null;
+
+			if (userStatus && uniqueExcludedStatuses.includes(userStatus)) {
+				continue;
+			}
+
+			animes.push({
+				id: entry.node.id,
+				title: entry.node.title,
+				image: entry.node.main_picture?.large ?? entry.node.main_picture?.medium ?? null,
+				rank: entry.ranking?.rank ?? entry.node.rank ?? null,
+				mean: entry.node.mean ?? null,
+				popularity: entry.node.popularity ?? null,
+				totalEpisodes: entry.node.num_episodes ?? null,
+				mediaType: entry.node.media_type ?? null,
+				animeStatus: entry.node.status ?? null,
+				startSeason: entry.node.start_season ?? null,
+				userStatus
+			});
+
+			if (animes.length >= normalizedLimit) {
+				break;
+			}
+		}
+
+		nextUrl = page.paging?.next;
+		pagesFetched += 1;
+	}
+
+	return {
+		username: resolvedUsername?.publicUsername ?? null,
+		rankingType,
+		excludedStatuses: uniqueExcludedStatuses,
 		count: animes.length,
 		animes
 	};

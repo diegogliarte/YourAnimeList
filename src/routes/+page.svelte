@@ -3,7 +3,6 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 
-	import AnimeLoading from '$lib/components/anime/AnimeLoading.svelte';
 	import AnimeRow from '$lib/components/anime/AnimeRow.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
@@ -14,7 +13,6 @@
 		Anime,
 		AnimeApiResponse,
 		AnimeSortMetric,
-		AnimeViewStatus,
 		SortDirection
 	} from '$lib/types/anime';
 
@@ -23,9 +21,14 @@
 		label: string;
 	};
 
-	const STATUS_FILTERS: Array<Option<AnimeViewStatus>> = [
+	type AnimeStatusFilter = Anime['status'];
+	type AnimeStatusSelection = AnimeStatusFilter | 'all';
+
+	const STATUS_FILTERS: Array<Option<AnimeStatusSelection>> = [
+		{ value: 'all', label: 'all' },
 		{ value: 'completed', label: 'completed' },
 		{ value: 'watching', label: 'watching' },
+		{ value: 'on_hold', label: 'on hold' },
 		{ value: 'dropped', label: 'dropped' },
 		{ value: 'plan_to_watch', label: 'plan to watch' }
 	];
@@ -41,8 +44,8 @@
 	const SORT_VALUES = SORT_OPTIONS.map((sort) => sort.value);
 	const DIRECTION_VALUES: SortDirection[] = ['asc', 'desc'];
 
-	const isAnimeViewStatus = (value: string | null): value is AnimeViewStatus => {
-		return STATUS_VALUES.includes(value as AnimeViewStatus);
+	const isAnimeStatusSelection = (value: string | null): value is AnimeStatusSelection => {
+		return STATUS_VALUES.includes(value as AnimeStatusSelection);
 	};
 
 	const isAnimeSortMetric = (value: string | null): value is AnimeSortMetric => {
@@ -61,8 +64,8 @@
 
 	let username = $state(initialUsername);
 	let loadedUsername = $state('');
-	let selectedStatus = $state<AnimeViewStatus>(
-		isAnimeViewStatus(initialStatus) ? initialStatus : 'completed'
+	let selectedStatus = $state<AnimeStatusSelection>(
+		isAnimeStatusSelection(initialStatus) ? initialStatus : 'completed'
 	);
 	let search = $state(initialSearch);
 	let sortMetric = $state<AnimeSortMetric>(
@@ -74,10 +77,6 @@
 	let data = $state<AnimeApiResponse | null>(null);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
-
-	const effectiveSortMetric = $derived<AnimeSortMetric>(
-		selectedStatus === 'completed' || sortMetric !== 'score' ? sortMetric : 'year'
-	);
 
 	const formatStatus = (status: string) => {
 		return status
@@ -99,7 +98,7 @@
 	): string | number | null => {
 		switch (metric) {
 			case 'score':
-				return anime.customScore;
+				return anime.customScore && anime.customScore > 0 ? anime.customScore : null;
 
 			case 'title':
 				return anime.title.toLowerCase();
@@ -121,15 +120,15 @@
 		const normalizedSearch = search.trim().toLowerCase();
 
 		return data.animes
-			.filter((anime) => anime.status === selectedStatus)
+			.filter((anime) => selectedStatus === 'all' || anime.status === selectedStatus)
 			.filter((anime) => {
 				if (!normalizedSearch) return true;
 
 				return anime.title.toLowerCase().includes(normalizedSearch);
 			})
 			.sort((a, b) => {
-				const aValue = getSortValue(a, effectiveSortMetric);
-				const bValue = getSortValue(b, effectiveSortMetric);
+				const aValue = getSortValue(a, sortMetric);
+				const bValue = getSortValue(b, sortMetric);
 
 				const aMissing = aValue === null;
 				const bMissing = bValue === null;
@@ -170,7 +169,7 @@
 										 }: {
 		nextUsername?: string;
 		nextSearch?: string;
-		nextStatus?: AnimeViewStatus;
+		nextStatus?: AnimeStatusSelection;
 		nextSort?: AnimeSortMetric;
 		nextDirection?: SortDirection;
 		replaceState?: boolean;
@@ -182,7 +181,7 @@
 
 		if (trimmedUsername) params.set('username', trimmedUsername);
 		if (trimmedSearch) params.set('q', trimmedSearch);
-		if (nextStatus !== 'completed') params.set('status', nextStatus);
+		if (nextStatus !== 'all') params.set('status', nextStatus);
 		if (nextSort !== 'score') params.set('sort', nextSort);
 		if (nextDirection !== 'desc') params.set('dir', nextDirection);
 
@@ -214,6 +213,7 @@
 
 			const response = await fetch(`/api/animes?${params.toString()}`);
 			const result = (await response.json()) as AnimeApiResponse & {
+				username?: string;
 				error?: string;
 				detail?: string;
 			};
@@ -222,12 +222,14 @@
 				throw new Error(result.detail || result.error || `Request failed with ${response.status}`);
 			}
 
+			const resultUsername = result.username ?? trimmedUsername;
+
 			data = result;
-			username = result.username;
-			loadedUsername = result.username;
+			username = resultUsername;
+			loadedUsername = resultUsername;
 
 			updateUrl({
-				nextUsername: result.username,
+				nextUsername: resultUsername,
 				replaceState: false
 			});
 		} catch (err) {
@@ -242,25 +244,15 @@
 		void loadAnimes();
 	};
 
-	const handleStatusChange = (status: AnimeViewStatus) => {
+	const handleStatusChange = (status: AnimeStatusSelection) => {
 		selectedStatus = status;
 
-		let nextSort = sortMetric;
-
-		if (status !== 'completed' && sortMetric === 'score') {
-			sortMetric = 'title';
-			nextSort = 'title';
-		}
-
 		updateUrl({
-			nextStatus: status,
-			nextSort
+			nextStatus: status
 		});
 	};
 
 	const handleSortChange = (metric: AnimeSortMetric) => {
-		if (metric === 'score' && selectedStatus !== 'completed') return;
-
 		sortMetric = metric;
 
 		updateUrl({
@@ -342,7 +334,7 @@
 	{/if}
 
 	{#if loading}
-		<AnimeLoading />
+		<div class="mx-auto mt-8 animate-pulse text-center text-xl text-accent">fetching data</div>
 	{:else if data}
 		<section class="overflow-hidden rounded-lg border border-white/10 bg-background shadow-xl shadow-black/20">
 			<div class="border-b border-white/10 bg-background px-3 py-2">
@@ -363,19 +355,20 @@
 						/>
 					</div>
 
-					<div class="flex gap-2">
-						<span class="text-xs py-1 font-medium text-accent w-12">filter</span>
+					<div class="flex flex-wrap items-center gap-2">
+						<span class="w-12 py-1 text-xs font-medium text-accent">filter</span>
+
 						{#each STATUS_FILTERS as status}
 							<button
 								type="button"
 								class={[
-										'cursor-pointer rounded px-2 py-1 text-xs font-medium transition',
-										selectedStatus === status.value
-											? 'bg-accent/10 text-accent'
-											: 'bg-white/10 text-neutral-400 hover:bg-white/[0.07] hover:text-white'
-									]
-										.filter(Boolean)
-										.join(' ')}
+									'cursor-pointer rounded px-2 py-1 text-xs font-medium transition',
+									selectedStatus === status.value
+										? 'bg-accent/10 text-accent'
+										: 'bg-white/10 text-neutral-400 hover:bg-white/[0.07] hover:text-white'
+								]
+									.filter(Boolean)
+									.join(' ')}
 								onclick={() => handleStatusChange(status.value)}
 							>
 								{status.label}
@@ -384,20 +377,15 @@
 					</div>
 
 					<div class="flex flex-wrap items-center gap-1.5">
-						<span class="text-xs py-1 font-medium text-accent w-12">sort</span>
+						<span class="w-12 py-1 text-xs font-medium text-accent">sort</span>
 
-						<div class="flex gap-2">
+						<div class="flex flex-wrap gap-2">
 							{#each SORT_OPTIONS as option}
-								{@const disabled = option.value === 'score' && selectedStatus !== 'completed'}
-
 								<button
 									type="button"
-									disabled={disabled}
-									title={disabled ? 'Score is only available for completed anime.' : undefined}
 									class={[
-										'rounded px-2 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-35',
-										disabled ? '' : 'cursor-pointer',
-										effectiveSortMetric === option.value
+										'cursor-pointer rounded px-2 py-1 text-xs font-medium transition',
+										sortMetric === option.value
 											? 'bg-accent/10 text-accent'
 											: 'bg-white/10 text-neutral-400 hover:bg-white/[0.07] hover:text-white'
 									]
@@ -426,12 +414,22 @@
 					No results.
 				</div>
 			{:else}
+				<div
+					class="grid grid-cols-[2.5rem_2.5rem_minmax(0,1fr)_3.25rem_2.5rem_7.5rem] items-center gap-3 border-b border-white/[0.07] px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wide text-neutral-500"
+				>
+					<span>#</span>
+					<span></span>
+					<span>title</span>
+					<span class="text-left">score</span>
+					<span class="text-left">eps</span>
+					<span class="text-right">season</span>
+				</div>
+
 				<ol class="divide-y divide-white/[0.07]">
 					{#each filteredAnimes as anime, index}
 						<AnimeRow
 							{anime}
 							{index}
-							{selectedStatus}
 							season={formatSeason(anime.startSeason)}
 						/>
 					{/each}
@@ -442,7 +440,7 @@
 		<section class="rounded-lg border border-white/10 bg-neutral-900/90 px-3 py-10 text-center shadow-xl shadow-black/20">
 			<h1 class="text-base font-medium text-white">Search a MyAnimeList profile.</h1>
 			<p class="mt-1 text-sm text-neutral-500">
-				Try <span class=" text-neutral-300">diego</span>.
+				Try <span class="text-neutral-300">diego</span>.
 			</p>
 		</section>
 	{/if}
