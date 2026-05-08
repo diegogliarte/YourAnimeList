@@ -1,63 +1,41 @@
 import { json } from '@sveltejs/kit';
 
-import { fetchUserAnimeList } from '$lib/server/mal';
+import { fetchUserAnimeList, isApiAnimeStatus } from '$lib/server/mal';
 
-import type { RequestHandler } from './$types';
-import type { ApiAnimeStatus } from '$lib/types/anime';
-
-const VALID_STATUSES = [
-	'watching',
-	'completed',
-	'on_hold',
-	'dropped',
-	'plan_to_watch'
-] as const;
-
-const isValidStatus = (status: string): status is ApiAnimeStatus => {
-	return VALID_STATUSES.includes(status as ApiAnimeStatus);
-};
-
-export const GET: RequestHandler = async ({ url }) => {
-	const username = url.searchParams.get('username')?.trim();
-	const requestedStatus = url.searchParams.get('status');
-
-	if (!username) {
-		return json(
-			{
-				error: 'Missing username query parameter.'
-			},
-			{ status: 400 }
-		);
-	}
-
-	if (requestedStatus && !isValidStatus(requestedStatus)) {
-		return json(
-			{
-				error: 'Invalid status query parameter.',
-				validStatuses: VALID_STATUSES
-			},
-			{ status: 400 }
-		);
-	}
-
+export const GET = async ({ url }) => {
 	try {
+		const username = url.searchParams.get('username')?.trim();
+
+		if (!username) {
+			return json(
+				{
+					error: 'Missing username.',
+					detail: 'The username query parameter is required.'
+				},
+				{
+					status: 400
+				}
+			);
+		}
+
+		const rawStatus = url.searchParams.get('status');
+		const status = isApiAnimeStatus(rawStatus) ? rawStatus : undefined;
+
 		const result = await fetchUserAnimeList({
 			username,
-			status: requestedStatus as ApiAnimeStatus | undefined
+			status
 		});
 
-		return json(result, {
-			headers: {
-				'Cache-Control': 'public, max-age=300, s-maxage=3600'
-			}
-		});
-	} catch (error) {
+		return json(result);
+	} catch (err) {
 		return json(
 			{
 				error: 'Failed to fetch anime list.',
-				detail: error instanceof Error ? error.message : 'Unknown error.'
+				detail: err instanceof Error ? err.message : 'Unknown error.'
 			},
-			{ status: 502 }
+			{
+				status: 500
+			}
 		);
 	}
 };

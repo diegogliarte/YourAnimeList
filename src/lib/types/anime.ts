@@ -5,19 +5,7 @@ export type ApiAnimeStatus =
 	| 'dropped'
 	| 'plan_to_watch';
 
-export type AnimeViewStatus =
-	| 'completed'
-	| 'watching'
-	| 'on_hold'
-	| 'dropped'
-	| 'plan_to_watch';
-
-export type AnimeSortMetric =
-	| 'score'
-	| 'title'
-	| 'year'
-	| 'totalEpisodes'
-	| 'episodesWatched';
+export type AnimeSortMetric = 'score' | 'title' | 'year' | 'totalEpisodes';
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -64,8 +52,8 @@ export type RankedAnime = {
 	title: string;
 	image: string | null;
 	rank: number | null;
-	mean: number | null;
 	popularity: number | null;
+	mean: number | null;
 	totalEpisodes: number | null;
 	mediaType: string | null;
 	animeStatus: string | null;
@@ -80,6 +68,8 @@ export type AnimeRankingApiResponse = {
 	username: string | null;
 	rankingType: AnimeRankingType;
 	excludedStatuses: ApiAnimeStatus[];
+	offset: number;
+	nextOffset: number | null;
 	count: number;
 	animes: RankedAnime[];
 };

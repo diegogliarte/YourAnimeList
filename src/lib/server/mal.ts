@@ -63,6 +63,16 @@ type MalAnimeRankingResponse = {
 
 const MAL_API_BASE_URL = 'https://api.myanimelist.net/v2';
 
+const USER_STATUS_CACHE_MS = 5 * 60 * 1000;
+
+const userStatusCache = new Map<
+	string,
+	{
+		expiresAt: number;
+		statusMap: Map<number, ApiAnimeStatus>;
+	}
+>();
+
 const ANIME_STATUS_VALUES: ApiAnimeStatus[] = [
 	'watching',
 	'completed',
@@ -82,9 +92,6 @@ const ANIME_RANKING_TYPES: AnimeRankingType[] = [
 	'bypopularity',
 	'favorite'
 ];
-
-const RANKING_PAGE_LIMIT = 500;
-const MAX_RANKING_PAGES = 4;
 
 export const isApiAnimeStatus = (value: string | null): value is ApiAnimeStatus => {
 	return ANIME_STATUS_VALUES.includes(value as ApiAnimeStatus);
@@ -173,18 +180,20 @@ const fetchMalJson = async <T>(url: string, clientId: string): Promise<T> => {
 	return response.json() as Promise<T>;
 };
 
-const fetchAnimePage = async (
-	url: string,
-	clientId: string
-): Promise<MalAnimeListResponse> => {
-	return fetchMalJson<MalAnimeListResponse>(url, clientId);
-};
+const parseNextOffset = (nextUrl?: string): number | null => {
+	if (!nextUrl) return null;
 
-const fetchRankingPage = async (
-	url: string,
-	clientId: string
-): Promise<MalAnimeRankingResponse> => {
-	return fetchMalJson<MalAnimeRankingResponse>(url, clientId);
+	try {
+		const url = new URL(nextUrl);
+		const rawOffset = url.searchParams.get('offset');
+		const offset = Number(rawOffset);
+
+		if (!Number.isFinite(offset)) return null;
+
+		return Math.max(0, Math.trunc(offset));
+	} catch {
+		return null;
+	}
 };
 
 export const fetchUserAnimeList = async ({
@@ -226,7 +235,7 @@ export const fetchUserAnimeList = async ({
 	let nextUrl: string | undefined = firstUrl.toString();
 
 	while (nextUrl) {
-		const page = await fetchAnimePage(nextUrl, clientId);
+		const page = await fetchMalJson<MalAnimeListResponse>(nextUrl, clientId);
 
 		for (const entry of page.data) {
 			const score = entry.list_status.score;
@@ -270,13 +279,25 @@ export const fetchUserAnimeList = async ({
 	};
 };
 
-const fetchUserStatusMap = async (username: string): Promise<Map<number, ApiAnimeStatus>> => {
-	const userList = await fetchUserAnimeList({ username });
+const fetchUserStatusMap = async (malUsername: string): Promise<Map<number, ApiAnimeStatus>> => {
+	const cacheKey = malUsername.toLowerCase();
+	const cached = userStatusCache.get(cacheKey);
+
+	if (cached && cached.expiresAt > Date.now()) {
+		return cached.statusMap;
+	}
+
+	const userList = await fetchUserAnimeList({ username: malUsername });
 	const statusMap = new Map<number, ApiAnimeStatus>();
 
 	for (const anime of userList.animes) {
 		statusMap.set(anime.id, anime.status);
 	}
+
+	userStatusCache.set(cacheKey, {
+		expiresAt: Date.now() + USER_STATUS_CACHE_MS,
+		statusMap
+	});
 
 	return statusMap;
 };
@@ -285,31 +306,35 @@ export const fetchAnimeRanking = async ({
 																					username,
 																					rankingType = 'all',
 																					excludedStatuses = ['completed'],
-																					limit = 100
+																					limit = 100,
+																					offset = 0
 																				}: {
 	username?: string;
 	rankingType?: AnimeRankingType;
 	excludedStatuses?: ApiAnimeStatus[];
 	limit?: number;
+	offset?: number;
 }): Promise<AnimeRankingApiResponse> => {
 	const clientId = getClientId();
+
+	const normalizedLimit = Math.max(1, Math.min(Math.trunc(limit), 500));
+	const normalizedOffset = Math.max(0, Math.trunc(offset));
+	const uniqueExcludedStatuses = [...new Set(excludedStatuses)];
+
 	const trimmedUsername = username?.trim() || null;
 	const resolvedUsername = trimmedUsername ? resolveUsername(trimmedUsername) : null;
 
-	const normalizedLimit = Math.max(1, Math.min(Math.trunc(limit), 200));
-	const uniqueExcludedStatuses = [...new Set(excludedStatuses)];
+	const userStatusMap = resolvedUsername
+		? await fetchUserStatusMap(resolvedUsername.malUsername)
+		: new Map<number, ApiAnimeStatus>();
 
-	const userStatusMap =
-		resolvedUsername && uniqueExcludedStatuses.length > 0
-			? await fetchUserStatusMap(resolvedUsername.malUsername)
-			: new Map<number, ApiAnimeStatus>();
+	const url = new URL(`${MAL_API_BASE_URL}/anime/ranking`);
 
-	const firstUrl = new URL(`${MAL_API_BASE_URL}/anime/ranking`);
-
-	firstUrl.searchParams.set('ranking_type', rankingType);
-	firstUrl.searchParams.set('limit', String(RANKING_PAGE_LIMIT));
-	firstUrl.searchParams.set('nsfw', 'true');
-	firstUrl.searchParams.set(
+	url.searchParams.set('ranking_type', rankingType);
+	url.searchParams.set('limit', String(normalizedLimit));
+	url.searchParams.set('offset', String(normalizedOffset));
+	url.searchParams.set('nsfw', 'true');
+	url.searchParams.set(
 		'fields',
 		[
 			'main_picture',
@@ -323,47 +348,38 @@ export const fetchAnimeRanking = async ({
 		].join(',')
 	);
 
-	const animes: RankedAnime[] = [];
-	let nextUrl: string | undefined = firstUrl.toString();
-	let pagesFetched = 0;
+	const page = await fetchMalJson<MalAnimeRankingResponse>(url.toString(), clientId);
 
-	while (nextUrl && animes.length < normalizedLimit && pagesFetched < MAX_RANKING_PAGES) {
-		const page = await fetchRankingPage(nextUrl, clientId);
-
-		for (const entry of page.data) {
+	const animes: RankedAnime[] = page.data
+		.map((entry) => {
 			const userStatus = userStatusMap.get(entry.node.id) ?? null;
 
-			if (userStatus && uniqueExcludedStatuses.includes(userStatus)) {
-				continue;
-			}
-
-			animes.push({
+			return {
 				id: entry.node.id,
 				title: entry.node.title,
 				image: entry.node.main_picture?.large ?? entry.node.main_picture?.medium ?? null,
-				rank: entry.ranking?.rank ?? entry.node.rank ?? null,
-				mean: entry.node.mean ?? null,
+				rank: entry.node?.rank ?? null,
 				popularity: entry.node.popularity ?? null,
+				mean: entry.node.mean ?? null,
 				totalEpisodes: entry.node.num_episodes ?? null,
 				mediaType: entry.node.media_type ?? null,
 				animeStatus: entry.node.status ?? null,
 				startSeason: entry.node.start_season ?? null,
 				userStatus
-			});
+			};
+		})
+		.filter((anime) => {
+			if (!anime.userStatus) return true;
 
-			if (animes.length >= normalizedLimit) {
-				break;
-			}
-		}
-
-		nextUrl = page.paging?.next;
-		pagesFetched += 1;
-	}
+			return !uniqueExcludedStatuses.includes(anime.userStatus);
+		});
 
 	return {
 		username: resolvedUsername?.publicUsername ?? null,
 		rankingType,
 		excludedStatuses: uniqueExcludedStatuses,
+		offset: normalizedOffset,
+		nextOffset: parseNextOffset(page.paging?.next),
 		count: animes.length,
 		animes
 	};

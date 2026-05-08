@@ -3,16 +3,16 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 
-	import AnimeRow from '$lib/components/anime/AnimeRow.svelte';
-	import Button from '$lib/components/ui/Button.svelte';
+	import AnimeHeader from '$lib/components/anime/AnimeHeader.svelte';
+	import AnimeTable from '$lib/components/anime/AnimeTable.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Shell from '$lib/components/ui/Shell.svelte';
-	import Tabs from '$lib/components/ui/Tabs.svelte';
 
 	import type {
 		Anime,
 		AnimeApiResponse,
 		AnimeSortMetric,
+		ApiAnimeStatus,
 		SortDirection
 	} from '$lib/types/anime';
 
@@ -21,8 +21,7 @@
 		label: string;
 	};
 
-	type AnimeStatusFilter = Anime['status'];
-	type AnimeStatusSelection = AnimeStatusFilter | 'all';
+	type AnimeStatusSelection = ApiAnimeStatus | 'all';
 
 	const STATUS_FILTERS: Array<Option<AnimeStatusSelection>> = [
 		{ value: 'all', label: 'all' },
@@ -65,7 +64,7 @@
 	let username = $state(initialUsername);
 	let loadedUsername = $state('');
 	let selectedStatus = $state<AnimeStatusSelection>(
-		isAnimeStatusSelection(initialStatus) ? initialStatus : 'completed'
+		isAnimeStatusSelection(initialStatus) ? initialStatus : 'all'
 	);
 	let search = $state(initialSearch);
 	let sortMetric = $state<AnimeSortMetric>(
@@ -77,20 +76,6 @@
 	let data = $state<AnimeApiResponse | null>(null);
 	let loading = $state(false);
 	let error = $state<string | null>(null);
-
-	const formatStatus = (status: string) => {
-		return status
-			.split('_')
-			.map((word) => word[0].toUpperCase() + word.slice(1))
-			.join(' ');
-	};
-
-	const formatSeason = (season: Anime['startSeason']) => {
-		if (!season?.year) return null;
-		if (!season.season) return String(season.year);
-
-		return `${formatStatus(season.season)} ${season.year}`;
-	};
 
 	const getSortValue = (
 		anime: Anime,
@@ -108,9 +93,6 @@
 
 			case 'totalEpisodes':
 				return anime.totalEpisodes;
-
-			case 'episodesWatched':
-				return anime.episodesWatched;
 		}
 	};
 
@@ -211,9 +193,12 @@
 				username: trimmedUsername
 			});
 
+			if (selectedStatus !== 'all') {
+				params.set('status', selectedStatus);
+			}
+
 			const response = await fetch(`/api/animes?${params.toString()}`);
 			const result = (await response.json()) as AnimeApiResponse & {
-				username?: string;
 				error?: string;
 				detail?: string;
 			};
@@ -222,14 +207,12 @@
 				throw new Error(result.detail || result.error || `Request failed with ${response.status}`);
 			}
 
-			const resultUsername = result.username ?? trimmedUsername;
-
 			data = result;
-			username = resultUsername;
-			loadedUsername = resultUsername;
+			username = result.username;
+			loadedUsername = result.username;
 
 			updateUrl({
-				nextUsername: resultUsername,
+				nextUsername: result.username,
 				replaceState: false
 			});
 		} catch (err) {
@@ -239,8 +222,7 @@
 		}
 	};
 
-	const handleSubmit = (event: SubmitEvent) => {
-		event.preventDefault();
+	const handleSubmit = () => {
 		void loadAnimes();
 	};
 
@@ -291,41 +273,13 @@
 </svelte:head>
 
 <Shell>
-	<header class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-		<div class="flex items-center gap-3">
-			<a href="/" class="cursor-pointer text-sm font-semibold tracking-tight text-white">
-				anime
-			</a>
-
-			<Tabs
-				tabs={[
-					{
-						label: 'list',
-						href: '/',
-						active: true
-					},
-					{
-						label: 'recommendations',
-						href: '/recommendations',
-						active: false
-					}
-				]}
-			/>
-		</div>
-
-		<form class="flex gap-2" onsubmit={handleSubmit}>
-			<Input
-				class="w-44 sm:w-56"
-				placeholder="username"
-				autocomplete="off"
-				bind:value={username}
-			/>
-
-			<Button type="submit" variant="solid" disabled={loading}>
-				{loading ? '...' : 'search'}
-			</Button>
-		</form>
-	</header>
+	<AnimeHeader
+		activeTab="list"
+		bind:username
+		query={search}
+		{loading}
+		onSubmit={handleSubmit}
+	/>
 
 	{#if error}
 		<div class="mb-3 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2 text-sm text-accent">
@@ -409,32 +363,11 @@
 				</div>
 			</div>
 
-			{#if filteredAnimes.length === 0}
-				<div class="px-3 py-10 text-center text-sm text-neutral-500">
-					No results.
-				</div>
-			{:else}
-				<div
-					class="grid grid-cols-[2.5rem_2.5rem_minmax(0,1fr)_3.25rem_2.5rem_7.5rem] items-center gap-3 border-b border-white/[0.07] px-3 py-2 text-[0.7rem] font-semibold uppercase tracking-wide text-neutral-500"
-				>
-					<span>#</span>
-					<span></span>
-					<span>title</span>
-					<span class="text-left">score</span>
-					<span class="text-left">eps</span>
-					<span class="text-right">season</span>
-				</div>
-
-				<ol class="divide-y divide-white/[0.07]">
-					{#each filteredAnimes as anime, index}
-						<AnimeRow
-							{anime}
-							{index}
-							season={formatSeason(anime.startSeason)}
-						/>
-					{/each}
-				</ol>
-			{/if}
+			<AnimeTable
+				mode="list"
+				animes={filteredAnimes}
+				emptyMessage="No results."
+			/>
 		</section>
 	{:else}
 		<section class="rounded-lg border border-white/10 bg-neutral-900/90 px-3 py-10 text-center shadow-xl shadow-black/20">

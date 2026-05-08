@@ -25,30 +25,55 @@ const parseExcludedStatuses = (value: string | null): ApiAnimeStatus[] => {
 	return statuses;
 };
 
-const parseLimit = (value: string | null) => {
+const parseInteger = ({
+												value,
+												fallback,
+												min,
+												max
+											}: {
+	value: string | null;
+	fallback: number;
+	min: number;
+	max: number;
+}) => {
 	const parsed = Number(value);
 
-	if (!Number.isFinite(parsed)) return 100;
+	if (!Number.isFinite(parsed)) return fallback;
 
-	return Math.max(1, Math.min(Math.trunc(parsed), 200));
+	return Math.max(min, Math.min(Math.trunc(parsed), max));
 };
 
 export const GET = async ({ url }) => {
 	try {
 		const username = url.searchParams.get('username')?.trim() || undefined;
+
 		const requestedRankingType = url.searchParams.get('rankingType');
 		const rankingType = isAnimeRankingType(requestedRankingType)
 			? requestedRankingType
 			: 'all';
 
 		const excludedStatuses = parseExcludedStatuses(url.searchParams.get('exclude'));
-		const limit = parseLimit(url.searchParams.get('limit'));
+
+		const limit = parseInteger({
+			value: url.searchParams.get('limit'),
+			fallback: 100,
+			min: 1,
+			max: 500
+		});
+
+		const offset = parseInteger({
+			value: url.searchParams.get('offset'),
+			fallback: 0,
+			min: 0,
+			max: 100_000
+		});
 
 		const result = await fetchAnimeRanking({
 			username,
 			rankingType,
 			excludedStatuses,
-			limit
+			limit,
+			offset
 		});
 
 		return json(result);
