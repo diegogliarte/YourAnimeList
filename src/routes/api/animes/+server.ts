@@ -5,7 +5,13 @@ import { fetchUserAnimeList } from '$lib/server/mal';
 import type { RequestHandler } from './$types';
 import type { ApiAnimeStatus } from '$lib/types/anime';
 
-const VALID_STATUSES = ['watching', 'completed', 'on_hold', 'dropped', 'plan_to_watch'] as const;
+const VALID_STATUSES = [
+	'watching',
+	'completed',
+	'on_hold',
+	'dropped',
+	'plan_to_watch'
+] as const;
 
 const isValidStatus = (status: string): status is ApiAnimeStatus => {
 	return VALID_STATUSES.includes(status as ApiAnimeStatus);
@@ -18,7 +24,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (!username) {
 		return json(
 			{
-				error: 'Missing username query parameter'
+				error: 'Missing username query parameter.'
 			},
 			{ status: 400 }
 		);
@@ -27,7 +33,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (requestedStatus && !isValidStatus(requestedStatus)) {
 		return json(
 			{
-				error: 'Invalid status query parameter',
+				error: 'Invalid status query parameter.',
 				validStatuses: VALID_STATUSES
 			},
 			{ status: 400 }
@@ -37,7 +43,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	try {
 		const result = await fetchUserAnimeList({
 			username,
-			status: requestedStatus as ApiAnimeStatus
+			status: requestedStatus as ApiAnimeStatus | undefined
 		});
 
 		return json(result, {
@@ -48,8 +54,8 @@ export const GET: RequestHandler = async ({ url }) => {
 	} catch (error) {
 		return json(
 			{
-				error: 'Failed to fetch anime list from MyAnimeList',
-				detail: error instanceof Error ? error.message : 'Unknown error'
+				error: 'Failed to fetch anime list.',
+				detail: error instanceof Error ? error.message : 'Unknown error.'
 			},
 			{ status: 502 }
 		);

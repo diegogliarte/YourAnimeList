@@ -73,7 +73,32 @@ const getDisplayScore = (score: number, tags: string[]): string => {
 	return String(score);
 };
 
-const fetchAnimePage = async (url: string, clientId: string): Promise<MalAnimeListResponse> => {
+const resolveUsername = (username: string) => {
+	const publicUsername = username.trim();
+
+	if (publicUsername.toLowerCase() !== 'diego') {
+		return {
+			publicUsername,
+			malUsername: publicUsername
+		};
+	}
+
+	const malUsername = env.MAL_USERNAME?.trim();
+
+	if (!malUsername) {
+		throw new Error('The diego alias is not configured.');
+	}
+
+	return {
+		publicUsername: 'diego',
+		malUsername
+	};
+};
+
+const fetchAnimePage = async (
+	url: string,
+	clientId: string
+): Promise<MalAnimeListResponse> => {
 	const response = await fetch(url, {
 		headers: {
 			'X-MAL-CLIENT-ID': clientId
@@ -81,28 +106,30 @@ const fetchAnimePage = async (url: string, clientId: string): Promise<MalAnimeLi
 	});
 
 	if (!response.ok) {
-		const errorText = await response.text();
-
-		throw new Error(`MAL request failed with ${response.status}: ${errorText}`);
+		throw new Error(`MyAnimeList returned ${response.status}.`);
 	}
 
 	return response.json() as Promise<MalAnimeListResponse>;
 };
 
 export const fetchUserAnimeList = async ({
-	username,
-	status
-}: {
+																					 username,
+																					 status
+																				 }: {
 	username: string;
 	status?: ApiAnimeStatus;
 }): Promise<AnimeApiResponse> => {
-	const clientId = env.MAL_CLIENT_ID;
+	const clientId = env.MAL_CLIENT_ID?.trim();
 
 	if (!clientId) {
-		throw new Error('Missing MAL_CLIENT_ID environment variable');
+		throw new Error('Missing MAL_CLIENT_ID environment variable.');
 	}
 
-	const firstUrl = new URL(`${MAL_API_BASE_URL}/users/${encodeURIComponent(username)}/animelist`);
+	const { publicUsername, malUsername } = resolveUsername(username);
+
+	const firstUrl = new URL(
+		`${MAL_API_BASE_URL}/users/${encodeURIComponent(malUsername)}/animelist`
+	);
 
 	firstUrl.searchParams.set('limit', '1000');
 	firstUrl.searchParams.set('sort', 'list_score');
@@ -166,7 +193,7 @@ export const fetchUserAnimeList = async ({
 	});
 
 	return {
-		username,
+		username: publicUsername,
 		status: status ?? 'all',
 		count: animes.length,
 		animes

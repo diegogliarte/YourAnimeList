@@ -1,1 +1,43 @@
 @import 'tailwindcss';
+
+@theme {
+    --color-accent: #e95420;
+    --color-background: #262626;
+}
+
+:root {
+    color-scheme: dark;
+    background: #09090b;
+}
+
+html {
+    overflow-y: scroll;
+    scrollbar-gutter: stable;
+    background: #09090b;
+}
+
+body {
+    margin: 0;
+    min-width: 320px;
+    background: #09090b;
+    color: #f5f5f5;
+    font-family:
+            'JetBrains Mono',
+            'Cascadia Code',
+            'SFMono-Regular',
+            'Consolas',
+            'Liberation Mono',
+            'Menlo',
+            'Monaco',
+            monospace;
+}
+
+button,
+a {
+    -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+    background: rgba(167, 139, 250, 0.35);
+    color: white;
+}
