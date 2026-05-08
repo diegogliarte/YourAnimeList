@@ -1,42 +1,65 @@
-# sv
+# Your Anime List
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A compact MyAnimeList viewer built with SvelteKit.
 
-## Creating a project
+Live site: [anime.diegogliarte.com](https://anime.diegogliarte.com)
 
-If you're seeing this, you've probably already done this step. Congrats!
+## About
 
-```sh
-# create a new project
-npx sv create my-app
-```
+Your Anime List is a small web app for browsing a MyAnimeList profile with a cleaner, faster, table-focused interface.
 
-To recreate this project with the same configuration:
+It lets you search a MAL username, inspect their anime list, filter by list status, sort entries, and discover new anime through MyAnimeList rankings while hiding entries already present in the user's list.
 
-```sh
-# recreate this project
-pnpm dlx sv@0.15.3 create --template minimal --types ts --add prettier eslint tailwindcss="plugins:none" --install pnpm your-anime-list
-```
+## Features
 
-## Developing
+- Search any public MyAnimeList profile.
+- View anime in a compact table layout.
+- Filter by status:
+    - all
+    - completed
+    - watching
+    - on hold
+    - dropped
+    - plan to watch
+- Sort by:
+    - score
+    - title
+    - year
+    - episodes
+- View useful anime metadata:
+    - title
+    - cover image
+    - score
+    - watched episodes
+    - total episodes
+    - season and year
+- Recommendations tab powered by MAL rankings.
+- Filter recommendations by ranking type:
+    - top
+    - airing
+    - upcoming
+    - TV
+    - movies
+    - OVA
+    - specials
+    - popularity
+    - favorites
+- Hide recommendations already present in the user's list.
+- Infinite scrolling for ranking results.
+- URL state for filters, sorting, search, and username.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+## Tech stack
 
-```sh
-npm run dev
+- [SvelteKit](https://svelte.dev/docs/kit)
+- [Svelte 5](https://svelte.dev/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [MyAnimeList API](https://myanimelist.net/apiconfig/references/api/v2)
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+## Environment variables
 
-## Building
+Create a `.env` file with:
 
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+```env
+MAL_CLIENT_ID=your_mal_client_id
+MAL_USERNAME=your_private_mal_username
