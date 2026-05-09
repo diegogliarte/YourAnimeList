@@ -80,7 +80,7 @@ export const GET = async ({ url }) => {
 	} catch (err) {
 		return json(
 			{
-				error: 'Failed to fetch recommendations.',
+				error: 'Failed to fetch rankings.',
 				detail: err instanceof Error ? err.message : 'Unknown error.'
 			},
 			{

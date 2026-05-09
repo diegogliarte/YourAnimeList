@@ -144,8 +144,8 @@
 		}
 
 		const href = params.toString()
-			? `/recommendations?${params.toString()}`
-			: '/recommendations';
+			? `/?${params.toString()}`
+			: '/rankings';
 
 		void goto(href, {
 			replaceState,
@@ -154,7 +154,7 @@
 		});
 	};
 
-	const buildRecommendationParams = ({
+	const buildRankingsParams = ({
 																			 targetUsername,
 																			 offset
 																		 }: {
@@ -177,7 +177,7 @@
 		return params;
 	};
 
-	const loadRecommendations = async ({
+	const loadRankings = async ({
 																			 targetUsername = username,
 																			 offset = 0,
 																			 append = false
@@ -206,12 +206,12 @@
 		try {
 			error = null;
 
-			const params = buildRecommendationParams({
+			const params = buildRankingsParams({
 				targetUsername: trimmedUsername,
 				offset
 			});
 
-			const response = await fetch(`/api/recommendations?${params.toString()}`);
+			const response = await fetch(`/api/rankings?${params.toString()}`);
 			const result = (await response.json()) as AnimeRankingApiResponse & {
 				error?: string;
 				detail?: string;
@@ -252,20 +252,20 @@
 		}
 	};
 
-	const reloadRecommendations = () => {
+	const reloadRankings = () => {
 		if (!loadedUsername && !username.trim()) return;
 
-		void loadRecommendations({
+		void loadRankings({
 			targetUsername: loadedUsername || username,
 			offset: 0,
 			append: false
 		});
 	};
 
-	const loadMoreRecommendations = () => {
+	const loadMoreRankings = () => {
 		if (nextOffset === null) return;
 
-		void loadRecommendations({
+		void loadRankings({
 			targetUsername: loadedUsername || username,
 			offset: nextOffset,
 			append: true
@@ -273,7 +273,7 @@
 	};
 
 	const handleSubmit = () => {
-		void loadRecommendations({
+		void loadRankings({
 			targetUsername: username,
 			offset: 0,
 			append: false
@@ -287,7 +287,7 @@
 			nextRankingType
 		});
 
-		reloadRecommendations();
+		reloadRankings();
 	};
 
 	const handleExcludeNone = () => {
@@ -297,7 +297,7 @@
 			nextExcludedStatuses: []
 		});
 
-		reloadRecommendations();
+		reloadRankings();
 	};
 
 	const handleExcludeStatusToggle = (status: ApiAnimeStatus) => {
@@ -315,7 +315,7 @@
 			nextExcludedStatuses
 		});
 
-		reloadRecommendations();
+		reloadRankings();
 	};
 
 	const handleScoreVisibilityToggle = () => {
@@ -344,7 +344,7 @@
 		const observer = new IntersectionObserver(
 			(entries) => {
 				if (entries[0]?.isIntersecting) {
-					loadMoreRecommendations();
+					loadMoreRankings();
 				}
 			},
 			{
@@ -361,7 +361,7 @@
 
 	onMount(() => {
 		if (initialUsername.trim()) {
-			void loadRecommendations({
+			void loadRankings({
 				targetUsername: initialUsername,
 				offset: 0,
 				append: false
@@ -371,13 +371,13 @@
 </script>
 
 <svelte:head>
-	<title>Anime Recommendations</title>
-	<meta name="description" content="MyAnimeList ranking-based anime recommendations." />
+	<title>Anime Rankings</title>
+	<meta name="description" content="MyAnimeList ranking-based anime rankings." />
 </svelte:head>
 
 <Shell>
 	<AnimeHeader
-		activeTab="recommendations"
+		activeTab="rankings"
 		bind:username
 		query={search}
 		loading={loading || loadingMore}
@@ -496,7 +496,7 @@
 				mode="ranking"
 				animes={filteredAnimes}
 				{showScore}
-				emptyMessage="No recommendations."
+				emptyMessage="No rankings."
 			/>
 
 			{#if hasMore}
@@ -517,7 +517,7 @@
 		<section class="rounded-lg border border-white/10 bg-neutral-900/90 px-3 py-10 text-center shadow-xl shadow-black/20">
 			<h1 class="text-base font-medium text-white">Search a MyAnimeList profile.</h1>
 			<p class="mt-1 text-sm text-neutral-500">
-				Recommendations use MAL rankings and can hide entries already in your list.
+				Rankings use MAL rankings and can hide entries already in your list.
 			</p>
 		</section>
 	{/if}

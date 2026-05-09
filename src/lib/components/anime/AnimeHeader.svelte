@@ -3,7 +3,7 @@
 	import Input from '$lib/components/ui/Input.svelte';
 	import Tabs from '$lib/components/ui/Tabs.svelte';
 
-	type ActiveTab = 'list' | 'recommendations';
+	type ActiveTab = 'list' | 'rankings';
 
 	type Props = {
 		activeTab: ActiveTab;
@@ -55,9 +55,9 @@
 					active: activeTab === 'list'
 				},
 				{
-					label: 'recommendations',
-					href: getTabHref('/recommendations'),
-					active: activeTab === 'recommendations'
+					label: 'rankings',
+					href: getTabHref('/rankings'),
+					active: activeTab === 'rankings'
 				}
 			]}
 		/>

@@ -33,8 +33,8 @@ It lets you search a MAL username, inspect their anime list, filter by list stat
     - watched episodes
     - total episodes
     - season and year
-- Recommendations tab powered by MAL rankings.
-- Filter recommendations by ranking type:
+- Rankings tab powered by MAL rankings.
+- Filter rankings by type:
     - top
     - airing
     - upcoming
@@ -44,7 +44,7 @@ It lets you search a MAL username, inspect their anime list, filter by list stat
     - specials
     - popularity
     - favorites
-- Hide recommendations already present in the user's list.
+- Hide top animes already present in the user's list.
 - Infinite scrolling for ranking results.
 - URL state for filters, sorting, search, and username.
 
