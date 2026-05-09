@@ -77,6 +77,13 @@
 	let loading = $state(false);
 	let error = $state<string | null>(null);
 
+	const SEASON_ORDER: Record<string, number> = {
+		winter: 1,
+		spring: 2,
+		summer: 3,
+		fall: 4
+	};
+
 	const getSortValue = (
 		anime: Anime,
 		metric: AnimeSortMetric
@@ -88,8 +95,16 @@
 			case 'title':
 				return anime.title.toLowerCase();
 
-			case 'year':
-				return anime.startSeason?.year ?? null;
+			case 'year': {
+				const year = anime.startSeason?.year;
+				if (!year) return null;
+
+				const season = anime.startSeason?.season
+					? SEASON_ORDER[anime.startSeason.season.toLowerCase()] ?? 0
+					: 0;
+
+				return year * 10 + season;
+			}
 
 			case 'totalEpisodes':
 				return anime.totalEpisodes;

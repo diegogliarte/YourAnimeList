@@ -144,7 +144,7 @@
 		}
 
 		const href = params.toString()
-			? `/?${params.toString()}`
+			? `/rankings?${params.toString()}`
 			: '/rankings';
 
 		void goto(href, {

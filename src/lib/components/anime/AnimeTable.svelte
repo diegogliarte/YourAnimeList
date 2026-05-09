@@ -96,6 +96,22 @@
 
 		return 'min-w-[680px]';
 	};
+
+	const SEASON_ORDER: Record<string, number> = {
+		winter: 1,
+		spring: 2,
+		summer: 3,
+		fall: 4
+	};
+
+	const getSeasonSortValue = (anime: Anime | RankedAnime) => {
+		const year = anime.startSeason?.year ?? 0;
+		const season = anime.startSeason?.season
+			? SEASON_ORDER[anime.startSeason.season.toLowerCase()] ?? 0
+			: 0;
+
+		return year * 10 + season;
+	};
 </script>
 
 {#if animes.length === 0}
