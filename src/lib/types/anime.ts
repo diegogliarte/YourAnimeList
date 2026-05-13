@@ -37,6 +37,7 @@ export type Anime = {
 		year?: number;
 		season?: string;
 	} | null;
+	averageEpisodeDuration: number | null;
 	tags: string[];
 };
 

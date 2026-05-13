@@ -1,9 +1,9 @@
 <script lang="ts">
-	import Button from '$lib/components/ui/Button.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
-	import Tabs from '$lib/components/ui/Tabs.svelte';
+	import { goto } from '$app/navigation';
 
-	type ActiveTab = 'list' | 'rankings';
+	import Input from '$lib/components/ui/Input.svelte';
+
+	type ActiveTab = 'list' | 'rankings' | 'stats';
 
 	type Props = {
 		activeTab: ActiveTab;
@@ -15,64 +15,96 @@
 
 	let {
 		activeTab,
-		username = $bindable(''),
+		username = $bindable(),
 		query = '',
 		loading = false,
 		onSubmit
 	}: Props = $props();
 
-	const getTabHref = (path: string) => {
-		const params = new URLSearchParams();
+	const tabs: Array<{
+		value: ActiveTab;
+		label: string;
+		href: string;
+	}> = [
+		{ value: 'list', label: 'list', href: '/list' },
+		{ value: 'rankings', label: 'rankings', href: '/rankings' },
+		{ value: 'stats', label: 'stats', href: '/stats' }
+	];
 
-		const trimmedUsername = username.trim();
-		const trimmedQuery = query.trim();
-
-		if (trimmedUsername) params.set('username', trimmedUsername);
-		if (trimmedQuery) params.set('q', trimmedQuery);
-
-		const queryString = params.toString();
-
-		return queryString ? `${path}?${queryString}` : path;
+	const handleSubmit = () => {
+		onSubmit();
 	};
 
-	const handleSubmit = (event: SubmitEvent) => {
-		event.preventDefault();
-		onSubmit();
+	const handleTabClick = (href: string) => {
+		const trimmedUsername = username.trim();
+
+		const params = new URLSearchParams();
+
+		if (trimmedUsername) {
+			params.set('username', trimmedUsername);
+		}
+
+		void goto(params.toString() ? `${href}?${params.toString()}` : href, {
+			noScroll: true,
+			keepFocus: true
+		});
 	};
 </script>
 
-<header class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-	<div class="flex items-center gap-3">
-		<a href={getTabHref('/')} class="cursor-pointer text-sm font-semibold tracking-tight text-white">
-			anime
-		</a>
+<header class="mb-3 rounded-lg border border-white/10 bg-background p-3 shadow-xl shadow-black/20">
+	<div class="flex flex-col gap-3">
+		<div class="flex flex-wrap items-center justify-between gap-2">
+			<div>
+				<h1 class="text-lg font-semibold text-white">Your Anime List</h1>
+			</div>
 
-		<Tabs
-			tabs={[
-				{
-					label: 'list',
-					href: getTabHref('/'),
-					active: activeTab === 'list'
-				},
-				{
-					label: 'rankings',
-					href: getTabHref('/rankings'),
-					active: activeTab === 'rankings'
-				}
-			]}
-		/>
+			<nav class="flex flex-wrap gap-2">
+				{#each tabs as tab (tab.value)}
+					<button
+						type="button"
+						class={[
+							'cursor-pointer rounded px-2 py-1 text-xs font-medium transition',
+							activeTab === tab.value
+								? 'bg-accent/10 text-accent'
+								: 'bg-white/10 text-neutral-400 hover:bg-white/[0.07] hover:text-white'
+						]
+							.filter(Boolean)
+							.join(' ')}
+						onclick={() => handleTabClick(tab.href)}
+					>
+						{tab.label}
+					</button>
+				{/each}
+			</nav>
+		</div>
+
+		<form class="flex flex-col gap-2 sm:flex-row" onsubmit={(event) => {
+			event.preventDefault();
+			handleSubmit();
+		}}>
+			<Input
+				placeholder="MAL username"
+				bind:value={username}
+			/>
+
+			<button
+				type="submit"
+				disabled={loading}
+				class="cursor-pointer rounded-md bg-accent px-2 py-1 text-sm font-medium text-black transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+			>
+				{loading ? 'loading' : 'search'}
+			</button>
+		</form>
+
+		<p class="truncate rounded-md bg-black/30 px-2 py-1 font-mono text-xs text-neutral-500">
+			<span class="text-accent">$</span>
+			mal-cli {activeTab}
+			{#if username.trim()}
+				--user {username.trim()}
+			{/if}
+			{#if query.trim()}
+				--query {query.trim()}
+			{/if}
+		</p>
 	</div>
-
-	<form class="flex gap-2" onsubmit={handleSubmit}>
-		<Input
-			class="w-44 sm:w-56"
-			placeholder="username"
-			autocomplete="off"
-			bind:value={username}
-		/>
-
-		<Button type="submit" variant="solid" disabled={loading}>
-			{loading ? '...' : 'search'}
-		</Button>
-	</form>
 </header>

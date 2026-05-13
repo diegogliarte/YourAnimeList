@@ -4,148 +4,54 @@
 	import { onMount } from 'svelte';
 
 	import AnimeHeader from '$lib/components/anime/AnimeHeader.svelte';
+	import AnimeRankingControls from '$lib/components/anime/AnimeRankingControls.svelte';
 	import AnimeTable from '$lib/components/anime/AnimeTable.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import ErrorBanner from '$lib/components/ui/ErrorBanner.svelte';
+	import LoadingState from '$lib/components/ui/LoadingState.svelte';
+	import ResultsPanel from '$lib/components/ui/ResultsPanel.svelte';
 	import Shell from '$lib/components/ui/Shell.svelte';
 
-	import type {
-		AnimeRankingApiResponse,
-		AnimeRankingType,
-		ApiAnimeStatus
-	} from '$lib/types/anime';
+	import { fetchAnimeRankings } from '$lib/api/anime';
+	import { PAGE_SIZE } from '$lib/constants/anime';
+	import { getAnimeCacheContext } from '$lib/state/anime-cache.svelte';
+	import { filterByTitle, mergeUniqueById } from '$lib/utils/anime';
+	import { buildAnimeRankingsHref, parseAnimeRankingsQuery } from '$lib/utils/anime-query';
 
-	type Option<T extends string> = {
-		value: T;
-		label: string;
-	};
+	import type { AnimeRankingType, ApiAnimeStatus } from '$lib/types/anime';
 
-	const PAGE_SIZE = 100;
+	const cache = getAnimeCacheContext();
+	const rankingsState = cache.rankings;
+	const initialQuery = parseAnimeRankingsQuery(page.url);
 
-	const RANKING_TYPES: Array<Option<AnimeRankingType>> = [
-		{ value: 'all', label: 'top' },
-		{ value: 'airing', label: 'airing' },
-		{ value: 'upcoming', label: 'upcoming' },
-		{ value: 'tv', label: 'tv' },
-		{ value: 'movie', label: 'movies' },
-		{ value: 'ova', label: 'ova' },
-		{ value: 'special', label: 'specials' },
-		{ value: 'bypopularity', label: 'popular' },
-		{ value: 'favorite', label: 'favorites' }
-	];
+	rankingsState.hydrate(initialQuery);
 
-	const EXCLUDE_STATUS_OPTIONS: Array<Option<ApiAnimeStatus>> = [
-		{ value: 'completed', label: 'completed' },
-		{ value: 'watching', label: 'watching' },
-		{ value: 'on_hold', label: 'on hold' },
-		{ value: 'dropped', label: 'dropped' },
-		{ value: 'plan_to_watch', label: 'plan to watch' }
-	];
-
-	const RANKING_TYPE_VALUES = RANKING_TYPES.map((rankingType) => rankingType.value);
-	const EXCLUDE_STATUS_VALUES = EXCLUDE_STATUS_OPTIONS.map((status) => status.value);
-
-	const isAnimeRankingType = (value: string | null): value is AnimeRankingType => {
-		return RANKING_TYPE_VALUES.includes(value as AnimeRankingType);
-	};
-
-	const isApiAnimeStatus = (value: string | null): value is ApiAnimeStatus => {
-		return EXCLUDE_STATUS_VALUES.includes(value as ApiAnimeStatus);
-	};
-
-	const parseExcludedStatuses = (value: string | null): ApiAnimeStatus[] => {
-		if (!value) return ['completed'];
-		if (value === 'none') return [];
-
-		const statuses: ApiAnimeStatus[] = [];
-
-		for (const rawStatus of value.split(',')) {
-			const status = rawStatus.trim();
-
-			if (isApiAnimeStatus(status) && !statuses.includes(status)) {
-				statuses.push(status);
-			}
-		}
-
-		return statuses;
-	};
-
-	const initialUsername = page.url.searchParams.get('username') ?? '';
-	const initialSearch = page.url.searchParams.get('q') ?? '';
-	const initialRankingType = page.url.searchParams.get('rankingType');
-	const initialExclude = page.url.searchParams.get('exclude');
-	const initialScoreVisibility = page.url.searchParams.get('score');
-
-	let username = $state(initialUsername);
-	let loadedUsername = $state('');
-	let search = $state(initialSearch);
-	let rankingType = $state<AnimeRankingType>(
-		isAnimeRankingType(initialRankingType) ? initialRankingType : 'all'
-	);
-	let excludedStatuses = $state<ApiAnimeStatus[]>(parseExcludedStatuses(initialExclude));
-	let showScore = $state(initialScoreVisibility !== 'hide');
-
-	let data = $state<AnimeRankingApiResponse | null>(null);
-	let nextOffset = $state<number | null>(null);
 	let loading = $state(false);
 	let loadingMore = $state(false);
 	let error = $state<string | null>(null);
 	let sentinelEl = $state<HTMLDivElement | null>(null);
 
-	const excludedStatusSet = $derived(new Set(excludedStatuses));
-	const hasMore = $derived(nextOffset !== null);
+	const hasMore = $derived(rankingsState.nextOffset !== null);
+	const filteredAnimes = $derived(filterByTitle(rankingsState.data?.animes ?? [], rankingsState.search));
 
-	const filteredAnimes = $derived.by(() => {
-		if (!data?.animes) return [];
-
-		const normalizedSearch = search.trim().toLowerCase();
-
-		if (!normalizedSearch) return data.animes;
-
-		return data.animes.filter((anime) => {
-			return anime.title.toLowerCase().includes(normalizedSearch);
+	const syncUrl = (
+		overrides: Partial<{
+			username: string;
+			search: string;
+			rankingType: AnimeRankingType;
+			excludedStatuses: ApiAnimeStatus[];
+			showScore: boolean;
+		}> = {},
+		replaceState = true
+	) => {
+		const href = buildAnimeRankingsHref({
+			username: rankingsState.loadedUsername || rankingsState.username,
+			search: rankingsState.search,
+			rankingType: rankingsState.rankingType,
+			excludedStatuses: rankingsState.excludedStatuses,
+			showScore: rankingsState.showScore,
+			...overrides
 		});
-	});
-
-	const updateUrl = ({
-											 nextUsername = loadedUsername || username,
-											 nextSearch = search,
-											 nextRankingType = rankingType,
-											 nextExcludedStatuses = excludedStatuses,
-											 nextShowScore = showScore,
-											 replaceState = true
-										 }: {
-		nextUsername?: string;
-		nextSearch?: string;
-		nextRankingType?: AnimeRankingType;
-		nextExcludedStatuses?: ApiAnimeStatus[];
-		nextShowScore?: boolean;
-		replaceState?: boolean;
-	} = {}) => {
-		const params = new URLSearchParams();
-
-		const trimmedUsername = nextUsername.trim();
-		const trimmedSearch = nextSearch.trim();
-
-		if (trimmedUsername) params.set('username', trimmedUsername);
-		if (trimmedSearch) params.set('q', trimmedSearch);
-		if (nextRankingType !== 'all') params.set('rankingType', nextRankingType);
-
-		if (nextExcludedStatuses.length === 0) {
-			params.set('exclude', 'none');
-		} else if (
-			nextExcludedStatuses.length !== 1 ||
-			nextExcludedStatuses[0] !== 'completed'
-		) {
-			params.set('exclude', nextExcludedStatuses.join(','));
-		}
-
-		if (!nextShowScore) {
-			params.set('score', 'hide');
-		}
-
-		const href = params.toString()
-			? `/rankings?${params.toString()}`
-			: '/rankings';
 
 		void goto(href, {
 			replaceState,
@@ -154,37 +60,18 @@
 		});
 	};
 
-	const buildRankingsParams = ({
-																			 targetUsername,
-																			 offset
-																		 }: {
-		targetUsername: string;
-		offset: number;
-	}) => {
-		const params = new URLSearchParams({
-			username: targetUsername,
-			rankingType,
-			limit: String(PAGE_SIZE),
-			offset: String(offset)
-		});
-
-		if (excludedStatuses.length === 0) {
-			params.set('exclude', 'none');
-		} else {
-			params.set('exclude', excludedStatuses.join(','));
-		}
-
-		return params;
-	};
-
 	const loadRankings = async ({
-																			 targetUsername = username,
-																			 offset = 0,
-																			 append = false
-																		 }: {
+																targetUsername = rankingsState.username,
+																offset = 0,
+																append = false,
+																requestRankingType = rankingsState.rankingType,
+																requestExcludedStatuses = rankingsState.excludedStatuses
+															}: {
 		targetUsername?: string;
 		offset?: number;
 		append?: boolean;
+		requestRankingType?: AnimeRankingType;
+		requestExcludedStatuses?: ApiAnimeStatus[];
 	} = {}) => {
 		const trimmedUsername = targetUsername.trim();
 
@@ -194,56 +81,40 @@
 		}
 
 		if (append) {
-			if (loadingMore || loading || nextOffset === null) return;
-
+			if (loading || loadingMore || rankingsState.nextOffset === null) return;
 			loadingMore = true;
 		} else {
 			loading = true;
-			data = null;
-			nextOffset = null;
+			rankingsState.startNewSearch(trimmedUsername);
 		}
 
 		try {
 			error = null;
 
-			const params = buildRankingsParams({
-				targetUsername: trimmedUsername,
+			const result = await fetchAnimeRankings({
+				username: trimmedUsername,
+				rankingType: requestRankingType,
+				excludedStatuses: requestExcludedStatuses,
+				limit: PAGE_SIZE,
 				offset
 			});
 
-			const response = await fetch(`/api/rankings?${params.toString()}`);
-			const result = (await response.json()) as AnimeRankingApiResponse & {
-				error?: string;
-				detail?: string;
-			};
+			if (append && rankingsState.data) {
+				const mergedAnimes = mergeUniqueById(rankingsState.data.animes, result.animes);
 
-			if (!response.ok) {
-				throw new Error(result.detail || result.error || `Request failed with ${response.status}`);
-			}
-
-			const resultUsername = result.username ?? trimmedUsername;
-
-			username = resultUsername;
-			loadedUsername = resultUsername;
-			nextOffset = result.nextOffset;
-
-			if (append && data) {
-				const existingIds = new Set(data.animes.map((anime) => anime.id));
-				const newAnimes = result.animes.filter((anime) => !existingIds.has(anime.id));
-
-				data = {
-					...result,
-					count: data.count + newAnimes.length,
-					animes: [...data.animes, ...newAnimes]
-				};
+				rankingsState.appendResult(result, mergedAnimes);
 			} else {
-				data = result;
+				rankingsState.setResult(result, trimmedUsername);
 			}
 
-			updateUrl({
-				nextUsername: resultUsername,
-				replaceState: false
-			});
+			syncUrl(
+				{
+					username: rankingsState.loadedUsername,
+					rankingType: requestRankingType,
+					excludedStatuses: requestExcludedStatuses
+				},
+				false
+			);
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Unknown error.';
 		} finally {
@@ -252,94 +123,80 @@
 		}
 	};
 
-	const reloadRankings = () => {
-		if (!loadedUsername && !username.trim()) return;
+	const reloadRankings = ({
+														nextRankingType = rankingsState.rankingType,
+														nextExcludedStatuses = rankingsState.excludedStatuses
+													}: {
+		nextRankingType?: AnimeRankingType;
+		nextExcludedStatuses?: ApiAnimeStatus[];
+	} = {}) => {
+		const targetUsername = rankingsState.loadedUsername || rankingsState.username;
+
+		if (!targetUsername.trim()) return;
 
 		void loadRankings({
-			targetUsername: loadedUsername || username,
+			targetUsername,
 			offset: 0,
-			append: false
+			append: false,
+			requestRankingType: nextRankingType,
+			requestExcludedStatuses: nextExcludedStatuses
 		});
 	};
 
 	const loadMoreRankings = () => {
-		if (nextOffset === null) return;
+		if (rankingsState.nextOffset === null) return;
 
 		void loadRankings({
-			targetUsername: loadedUsername || username,
-			offset: nextOffset,
+			targetUsername: rankingsState.loadedUsername || rankingsState.username,
+			offset: rankingsState.nextOffset,
 			append: true
 		});
 	};
 
 	const handleSubmit = () => {
 		void loadRankings({
-			targetUsername: username,
+			targetUsername: rankingsState.username,
 			offset: 0,
 			append: false
 		});
 	};
 
 	const handleRankingTypeChange = (nextRankingType: AnimeRankingType) => {
-		rankingType = nextRankingType;
+		rankingsState.rankingType = nextRankingType;
 
-		updateUrl({
+		syncUrl({ rankingType: nextRankingType });
+
+		reloadRankings({
 			nextRankingType
 		});
-
-		reloadRankings();
 	};
 
-	const handleExcludeNone = () => {
-		excludedStatuses = [];
+	const handleExcludedStatusesChange = (nextExcludedStatuses: ApiAnimeStatus[]) => {
+		rankingsState.excludedStatuses = nextExcludedStatuses;
 
-		updateUrl({
-			nextExcludedStatuses: []
-		});
+		syncUrl({ excludedStatuses: nextExcludedStatuses });
 
-		reloadRankings();
-	};
-
-	const handleExcludeStatusToggle = (status: ApiAnimeStatus) => {
-		let nextExcludedStatuses: ApiAnimeStatus[];
-
-		if (excludedStatuses.includes(status)) {
-			nextExcludedStatuses = excludedStatuses.filter((excludedStatus) => excludedStatus !== status);
-		} else {
-			nextExcludedStatuses = [...excludedStatuses, status];
-		}
-
-		excludedStatuses = nextExcludedStatuses;
-
-		updateUrl({
+		reloadRankings({
 			nextExcludedStatuses
 		});
-
-		reloadRankings();
 	};
 
 	const handleScoreVisibilityToggle = () => {
-		showScore = !showScore;
+		const nextShowScore = !rankingsState.showScore;
 
-		updateUrl({
-			nextShowScore: showScore
-		});
+		rankingsState.showScore = nextShowScore;
+		syncUrl({ showScore: nextShowScore });
 	};
 
-	const handleTitleSearchInput = (event: Event) => {
-		const target = event.currentTarget as HTMLInputElement;
-
-		search = target.value;
-
-		updateUrl({
-			nextSearch: search
-		});
+	const handleSearchChange = (nextSearch: string) => {
+		rankingsState.search = nextSearch;
+		syncUrl({ search: nextSearch });
 	};
 
 	$effect(() => {
 		const element = sentinelEl;
 
-		if (!element || !data || !hasMore || loading || loadingMore) return;
+		if (!element || !rankingsState.data || !hasMore || loading || loadingMore) return;
 
 		const observer = new IntersectionObserver(
 			(entries) => {
@@ -360,7 +217,14 @@
 	});
 
 	onMount(() => {
-		if (initialUsername.trim()) {
+		const initialUsername = initialQuery.username.trim();
+
+		if (!initialUsername) return;
+
+		const alreadyLoadedSameUser =
+			rankingsState.data && rankingsState.loadedUsername === initialUsername;
+
+		if (!alreadyLoadedSameUser) {
 			void loadRankings({
 				targetUsername: initialUsername,
 				offset: 0,
@@ -378,124 +242,35 @@
 <Shell>
 	<AnimeHeader
 		activeTab="rankings"
-		bind:username
-		query={search}
+		bind:username={rankingsState.username}
+		query={rankingsState.search}
 		loading={loading || loadingMore}
 		onSubmit={handleSubmit}
 	/>
 
-	{#if error}
-		<div class="mb-3 rounded-lg border border-accent/20 bg-accent/10 px-3 py-2 text-sm text-accent">
-			{error}
-		</div>
-	{/if}
+	<ErrorBanner message={error} />
 
 	{#if loading}
-		<div class="mx-auto mt-8 animate-pulse text-center text-xl text-accent">
-			fetching rankings
-		</div>
-	{:else if data}
-		<section class="overflow-hidden rounded-lg border border-white/10 bg-background shadow-xl shadow-black/20">
-			<div class="border-b border-white/10 bg-background px-3 py-2">
-				<div class="flex flex-col gap-2">
-					<div class="flex min-w-0 items-center gap-2">
-						<p class="truncate text-sm text-neutral-300">
-							<span class="font-medium text-white">{loadedUsername}</span>
-							<span class="text-neutral-600"> · </span>
-							<span>{filteredAnimes.length}</span>
-							<span class="text-neutral-500"> loaded</span>
-						</p>
-
-						<Input
-							class="w-40"
-							placeholder="filter"
-							bind:value={search}
-							oninput={handleTitleSearchInput}
-						/>
-					</div>
-
-					<div class="flex flex-wrap items-center gap-2">
-						<span class="w-12 py-1 text-xs font-medium text-accent">type</span>
-
-						{#each RANKING_TYPES as option}
-							<button
-								type="button"
-								class={[
-									'cursor-pointer rounded px-2 py-1 text-xs font-medium transition',
-									rankingType === option.value
-										? 'bg-accent/10 text-accent'
-										: 'bg-white/10 text-neutral-400 hover:bg-white/[0.07] hover:text-white'
-								]
-									.filter(Boolean)
-									.join(' ')}
-								onclick={() => handleRankingTypeChange(option.value)}
-							>
-								{option.label}
-							</button>
-						{/each}
-					</div>
-
-					<div class="flex flex-wrap items-center gap-2">
-						<span class="w-12 py-1 text-xs font-medium text-accent">exclude</span>
-
-						<button
-							type="button"
-							class={[
-								'cursor-pointer rounded px-2 py-1 text-xs font-medium transition',
-								excludedStatuses.length === 0
-									? 'bg-accent/10 text-accent'
-									: 'bg-white/10 text-neutral-400 hover:bg-white/[0.07] hover:text-white'
-							]
-								.filter(Boolean)
-								.join(' ')}
-							onclick={handleExcludeNone}
-						>
-							none
-						</button>
-
-						{#each EXCLUDE_STATUS_OPTIONS as option}
-							<button
-								type="button"
-								class={[
-									'cursor-pointer rounded px-2 py-1 text-xs font-medium transition',
-									excludedStatusSet.has(option.value)
-										? 'bg-accent/10 text-accent'
-										: 'bg-white/10 text-neutral-400 hover:bg-white/[0.07] hover:text-white'
-								]
-									.filter(Boolean)
-									.join(' ')}
-								onclick={() => handleExcludeStatusToggle(option.value)}
-							>
-								{option.label}
-							</button>
-						{/each}
-					</div>
-
-					<div class="flex flex-wrap items-center gap-2">
-						<span class="w-12 py-1 text-xs font-medium text-accent">view</span>
-
-						<button
-							type="button"
-							class={[
-								'cursor-pointer rounded px-2 py-1 text-xs font-medium transition',
-								showScore
-									? 'bg-accent/10 text-accent'
-									: 'bg-white/10 text-neutral-400 hover:bg-white/[0.07] hover:text-white'
-							]
-								.filter(Boolean)
-								.join(' ')}
-							onclick={handleScoreVisibilityToggle}
-						>
-							{showScore ? 'score shown' : 'score hidden'}
-						</button>
-					</div>
-				</div>
-			</div>
+		<LoadingState message="fetching rankings" />
+	{:else if rankingsState.data}
+		<ResultsPanel>
+			<AnimeRankingControls
+				username={rankingsState.loadedUsername}
+				visibleCount={filteredAnimes.length}
+				search={rankingsState.search}
+				rankingType={rankingsState.rankingType}
+				excludedStatuses={rankingsState.excludedStatuses}
+				showScore={rankingsState.showScore}
+				onSearchChange={handleSearchChange}
+				onRankingTypeChange={handleRankingTypeChange}
+				onExcludedStatusesChange={handleExcludedStatusesChange}
+				onScoreVisibilityToggle={handleScoreVisibilityToggle}
+			/>
 
 			<AnimeTable
 				mode="ranking"
 				animes={filteredAnimes}
-				{showScore}
+				showScore={rankingsState.showScore}
 				emptyMessage="No rankings."
 			/>
 
@@ -512,13 +287,11 @@
 					end of rankings
 				</div>
 			{/if}
-		</section>
+		</ResultsPanel>
 	{:else}
-		<section class="rounded-lg border border-white/10 bg-neutral-900/90 px-3 py-10 text-center shadow-xl shadow-black/20">
-			<h1 class="text-base font-medium text-white">Search a MyAnimeList profile.</h1>
-			<p class="mt-1 text-sm text-neutral-500">
-				Rankings use MAL rankings and can hide entries already in your list.
-			</p>
-		</section>
+		<EmptyState
+			title="Search a MyAnimeList profile."
+			description="Rankings use MAL rankings and can hide entries already in your list."
+		/>
 	{/if}
 </Shell>

@@ -20,6 +20,7 @@ type MalAnimeNode = {
 	rank?: number;
 	popularity?: number;
 	num_episodes?: number;
+	average_episode_duration?: number;
 	media_type?: string;
 	status?: string;
 	start_season?: {
@@ -64,14 +65,32 @@ type MalAnimeRankingResponse = {
 const MAL_API_BASE_URL = 'https://api.myanimelist.net/v2';
 
 const USER_STATUS_CACHE_MS = 5 * 60 * 1000;
+const USER_ANIME_LIST_LIMIT = 1000;
+const RANKING_LIMIT_MIN = 1;
+const RANKING_LIMIT_MAX = 500;
 
-const userStatusCache = new Map<
-	string,
-	{
-		expiresAt: number;
-		statusMap: Map<number, ApiAnimeStatus>;
-	}
->();
+const ANIME_LIST_FIELDS = [
+	'main_picture',
+	'list_status{status,score,num_episodes_watched,tags}',
+	'mean',
+	'num_episodes',
+	'average_episode_duration',
+	'media_type',
+	'status',
+	'start_season'
+].join(',');
+
+const ANIME_RANKING_FIELDS = [
+	'main_picture',
+	'mean',
+	'rank',
+	'popularity',
+	'num_episodes',
+	'average_episode_duration',
+	'media_type',
+	'status',
+	'start_season'
+].join(',');
 
 const ANIME_STATUS_VALUES: ApiAnimeStatus[] = [
 	'watching',
@@ -93,6 +112,14 @@ const ANIME_RANKING_TYPES: AnimeRankingType[] = [
 	'favorite'
 ];
 
+const userStatusCache = new Map<
+	string,
+	{
+		expiresAt: number;
+		statusMap: Map<number, ApiAnimeStatus>;
+	}
+>();
+
 export const isApiAnimeStatus = (value: string | null): value is ApiAnimeStatus => {
 	return ANIME_STATUS_VALUES.includes(value as ApiAnimeStatus);
 };
@@ -111,41 +138,12 @@ const getClientId = () => {
 	return clientId;
 };
 
-const normalizeTags = (rawTags?: string[] | string): string[] => {
-	if (!rawTags) return [];
-
-	if (Array.isArray(rawTags)) {
-		return rawTags.map((tag) => tag.trim()).filter(Boolean);
-	}
-
-	return rawTags
-		.split(',')
-		.map((tag) => tag.trim())
-		.filter(Boolean);
-};
-
-const getScoreModifier = (tags: string[]): number => {
-	const normalizedTags = tags.map((tag) => tag.toLowerCase());
-
-	if (normalizedTags.includes('plus')) return 0.25;
-	if (normalizedTags.includes('minus')) return -0.25;
-
-	return 0;
-};
-
-const getDisplayScore = (score: number, tags: string[]): string => {
-	if (score === 0) return '-';
-
-	const normalizedTags = tags.map((tag) => tag.toLowerCase());
-
-	if (normalizedTags.includes('plus')) return `${score}+`;
-	if (normalizedTags.includes('minus')) return `${score}-`;
-
-	return String(score);
-};
-
 const resolveUsername = (username: string) => {
 	const publicUsername = username.trim();
+
+	if (!publicUsername) {
+		throw new Error('Missing MyAnimeList username.');
+	}
 
 	if (publicUsername.toLowerCase() !== 'diego') {
 		return {
@@ -166,18 +164,53 @@ const resolveUsername = (username: string) => {
 	};
 };
 
-const fetchMalJson = async <T>(url: string, clientId: string): Promise<T> => {
-	const response = await fetch(url, {
-		headers: {
-			'X-MAL-CLIENT-ID': clientId
-		}
-	});
+const normalizeTags = (rawTags?: string[] | string): string[] => {
+	if (!rawTags) return [];
 
-	if (!response.ok) {
-		throw new Error(`MyAnimeList returned ${response.status}.`);
+	if (Array.isArray(rawTags)) {
+		return rawTags.map((tag) => tag.trim()).filter(Boolean);
 	}
 
-	return response.json() as Promise<T>;
+	return rawTags
+		.split(',')
+		.map((tag) => tag.trim())
+		.filter(Boolean);
+};
+
+const getScoreModifier = (tags: string[]) => {
+	const normalizedTags = tags.map((tag) => tag.toLowerCase());
+
+	if (normalizedTags.includes('plus')) return 0.25;
+	if (normalizedTags.includes('minus')) return -0.25;
+
+	return 0;
+};
+
+const getDisplayScore = (score: number, tags: string[]) => {
+	if (score === 0) return '-';
+
+	const normalizedTags = tags.map((tag) => tag.toLowerCase());
+
+	if (normalizedTags.includes('plus')) return `${score}+`;
+	if (normalizedTags.includes('minus')) return `${score}-`;
+
+	return String(score);
+};
+
+const getImage = (node: MalAnimeNode) => {
+	return node.main_picture?.large ?? node.main_picture?.medium ?? null;
+};
+
+const normalizeLimit = (limit: number) => {
+	if (!Number.isFinite(limit)) return RANKING_LIMIT_MAX;
+
+	return Math.max(RANKING_LIMIT_MIN, Math.min(Math.trunc(limit), RANKING_LIMIT_MAX));
+};
+
+const normalizeOffset = (offset: number) => {
+	if (!Number.isFinite(offset)) return 0;
+
+	return Math.max(0, Math.trunc(offset));
 };
 
 const parseNextOffset = (nextUrl?: string): number | null => {
@@ -196,6 +229,80 @@ const parseNextOffset = (nextUrl?: string): number | null => {
 	}
 };
 
+const fetchMalJson = async <T>(url: string, clientId: string): Promise<T> => {
+	const response = await fetch(url, {
+		headers: {
+			'X-MAL-CLIENT-ID': clientId
+		}
+	});
+
+	if (!response.ok) {
+		let detail = '';
+
+		try {
+			const payload = (await response.json()) as {
+				error?: string;
+				message?: string;
+			};
+
+			detail = payload.message || payload.error || '';
+		} catch {
+			// MAL sometimes returns an empty/non-JSON error body.
+		}
+
+		throw new Error(
+			detail
+				? `MyAnimeList returned ${response.status}: ${detail}`
+				: `MyAnimeList returned ${response.status}.`
+		);
+	}
+
+	return response.json() as Promise<T>;
+};
+
+const mapAnimeEntry = (entry: MalAnimeEntry): Anime => {
+	const score = entry.list_status.score;
+	const tags = normalizeTags(entry.list_status.tags);
+	const customScore = score === 0 ? 0 : score + getScoreModifier(tags);
+
+	return {
+		id: entry.node.id,
+		title: entry.node.title,
+		image: getImage(entry.node),
+		score,
+		displayScore: getDisplayScore(score, tags),
+		customScore,
+		status: entry.list_status.status,
+		episodesWatched: entry.list_status.num_episodes_watched,
+		totalEpisodes: entry.node.num_episodes ?? null,
+		averageEpisodeDuration: entry.node.average_episode_duration ?? null,
+		mean: entry.node.mean ?? null,
+		mediaType: entry.node.media_type ?? null,
+		animeStatus: entry.node.status ?? null,
+		startSeason: entry.node.start_season ?? null,
+		tags
+	};
+};
+
+const mapRankingEntry = (
+	entry: MalRankingEntry,
+	userStatus: ApiAnimeStatus | null
+): RankedAnime => {
+	return {
+		id: entry.node.id,
+		title: entry.node.title,
+		image: getImage(entry.node),
+		rank: entry.node.rank ?? entry.ranking?.rank ?? null,
+		popularity: entry.node.popularity ?? null,
+		mean: entry.node.mean ?? null,
+		totalEpisodes: entry.node.num_episodes ?? null,
+		mediaType: entry.node.media_type ?? null,
+		animeStatus: entry.node.status ?? null,
+		startSeason: entry.node.start_season ?? null,
+		userStatus
+	};
+};
+
 export const fetchUserAnimeList = async ({
 																					 username,
 																					 status
@@ -210,26 +317,14 @@ export const fetchUserAnimeList = async ({
 		`${MAL_API_BASE_URL}/users/${encodeURIComponent(malUsername)}/animelist`
 	);
 
-	firstUrl.searchParams.set('limit', '1000');
+	firstUrl.searchParams.set('limit', String(USER_ANIME_LIST_LIMIT));
 	firstUrl.searchParams.set('sort', 'list_score');
 	firstUrl.searchParams.set('nsfw', 'true');
+	firstUrl.searchParams.set('fields', ANIME_LIST_FIELDS);
 
 	if (status) {
 		firstUrl.searchParams.set('status', status);
 	}
-
-	firstUrl.searchParams.set(
-		'fields',
-		[
-			'main_picture',
-			'list_status{status,score,num_episodes_watched,tags}',
-			'mean',
-			'num_episodes',
-			'media_type',
-			'status',
-			'start_season'
-		].join(',')
-	);
 
 	const animes: Anime[] = [];
 	let nextUrl: string | undefined = firstUrl.toString();
@@ -238,26 +333,7 @@ export const fetchUserAnimeList = async ({
 		const page = await fetchMalJson<MalAnimeListResponse>(nextUrl, clientId);
 
 		for (const entry of page.data) {
-			const score = entry.list_status.score;
-			const tags = normalizeTags(entry.list_status.tags);
-			const customScore = score === 0 ? 0 : score + getScoreModifier(tags);
-
-			animes.push({
-				id: entry.node.id,
-				title: entry.node.title,
-				image: entry.node.main_picture?.large ?? entry.node.main_picture?.medium ?? null,
-				score,
-				displayScore: getDisplayScore(score, tags),
-				customScore,
-				status: entry.list_status.status,
-				episodesWatched: entry.list_status.num_episodes_watched,
-				totalEpisodes: entry.node.num_episodes ?? null,
-				mean: entry.node.mean ?? null,
-				mediaType: entry.node.media_type ?? null,
-				animeStatus: entry.node.status ?? null,
-				startSeason: entry.node.start_season ?? null,
-				tags
-			});
+			animes.push(mapAnimeEntry(entry));
 		}
 
 		nextUrl = page.paging?.next;
@@ -287,7 +363,10 @@ const fetchUserStatusMap = async (malUsername: string): Promise<Map<number, ApiA
 		return cached.statusMap;
 	}
 
-	const userList = await fetchUserAnimeList({ username: malUsername });
+	const userList = await fetchUserAnimeList({
+		username: malUsername
+	});
+
 	const statusMap = new Map<number, ApiAnimeStatus>();
 
 	for (const anime of userList.animes) {
@@ -317,8 +396,8 @@ export const fetchAnimeRanking = async ({
 }): Promise<AnimeRankingApiResponse> => {
 	const clientId = getClientId();
 
-	const normalizedLimit = Math.max(1, Math.min(Math.trunc(limit), 500));
-	const normalizedOffset = Math.max(0, Math.trunc(offset));
+	const normalizedLimit = normalizeLimit(limit);
+	const normalizedOffset = normalizeOffset(offset);
 	const uniqueExcludedStatuses = [...new Set(excludedStatuses)];
 
 	const trimmedUsername = username?.trim() || null;
@@ -334,19 +413,7 @@ export const fetchAnimeRanking = async ({
 	url.searchParams.set('limit', String(normalizedLimit));
 	url.searchParams.set('offset', String(normalizedOffset));
 	url.searchParams.set('nsfw', 'true');
-	url.searchParams.set(
-		'fields',
-		[
-			'main_picture',
-			'mean',
-			'rank',
-			'popularity',
-			'num_episodes',
-			'media_type',
-			'status',
-			'start_season'
-		].join(',')
-	);
+	url.searchParams.set('fields', ANIME_RANKING_FIELDS);
 
 	const page = await fetchMalJson<MalAnimeRankingResponse>(url.toString(), clientId);
 
@@ -354,19 +421,7 @@ export const fetchAnimeRanking = async ({
 		.map((entry) => {
 			const userStatus = userStatusMap.get(entry.node.id) ?? null;
 
-			return {
-				id: entry.node.id,
-				title: entry.node.title,
-				image: entry.node.main_picture?.large ?? entry.node.main_picture?.medium ?? null,
-				rank: entry.node?.rank ?? null,
-				popularity: entry.node.popularity ?? null,
-				mean: entry.node.mean ?? null,
-				totalEpisodes: entry.node.num_episodes ?? null,
-				mediaType: entry.node.media_type ?? null,
-				animeStatus: entry.node.status ?? null,
-				startSeason: entry.node.start_season ?? null,
-				userStatus
-			};
+			return mapRankingEntry(entry, userStatus);
 		})
 		.filter((anime) => {
 			if (!anime.userStatus) return true;

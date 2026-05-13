@@ -12,7 +12,7 @@
 	{...rest}
 	bind:value
 	class={[
-		'h-8 rounded-md border border-white/10 bg-neutral-950/80 px-2.5 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-accent focus:bg-neutral-950',
+		'rounded-md border border-white/10 bg-neutral-950/80 px-2 py-1 text-sm text-white outline-none transition placeholder:text-neutral-600 focus:border-accent focus:bg-neutral-950',
 		className
 	]
 		.filter(Boolean)
