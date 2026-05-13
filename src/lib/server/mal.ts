@@ -40,6 +40,7 @@ type MalListStatus = {
 	status: ApiAnimeStatus;
 	score: number;
 	num_episodes_watched: number;
+	num_times_rewatched: number;
 	tags?: string[] | string;
 };
 
@@ -78,7 +79,7 @@ const RANKING_LIMIT_MAX = 500;
 
 const ANIME_LIST_FIELDS = [
 	'main_picture',
-	'list_status{status,score,num_episodes_watched,tags}',
+	'list_status{status,score,num_episodes_watched,tags,num_times_rewatched}',
 	'mean',
 	'num_episodes',
 	'average_episode_duration',
@@ -301,7 +302,8 @@ const mapAnimeEntry = (entry: MalAnimeEntry): Anime => {
 		animeStatus: entry.node.status ?? null,
 		startSeason: entry.node.start_season ?? null,
 		genres: normalizeGenres(entry.node.genres),
-		tags
+		tags,
+		numberOfTimesRewatched: entry.list_status.num_times_rewatched
 	};
 };
 

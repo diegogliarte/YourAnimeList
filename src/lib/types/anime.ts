@@ -47,6 +47,7 @@ export type Anime = {
 	startSeason: AnimeSeason | null;
 	genres: AnimeGenre[];
 	tags: string[];
+	numberOfTimesRewatched: number;
 };
 
 export type RankedAnime = {

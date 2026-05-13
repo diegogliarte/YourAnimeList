@@ -7,6 +7,7 @@
 	import BarChart from '$lib/components/stats/BarChart.svelte';
 	import GenreStatsTable from '$lib/components/stats/GenreStatsTable.svelte';
 	import RuntimeStatsTable from '$lib/components/stats/RuntimeStatsTable.svelte';
+	import RewatchStatsTable from '$lib/components/stats/RewatchStatsTable.svelte';
 	import StatCard from '$lib/components/stats/StatCard.svelte';
 	import StatsTable from '$lib/components/stats/StatsTable.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
@@ -140,14 +141,20 @@
 					<BarChart title="completed genres" items={stats.genreDistribution} />
 					<BarChart title="completed media" items={stats.mediaTypeDistribution} />
 					<BarChart title="completed episodes" items={stats.episodeDistribution} />
+					<BarChart title="completed years" items={stats.topYears} />
 				</div>
 
-				<div class="grid gap-2 lg:grid-cols-3">
-					<StatsTable
-						title="completed years"
-						items={stats.topYears}
-						labelHeader="year"
-						valueHeader="entries"
+				<div class="grid gap-2 lg:grid-cols-2">
+					<RuntimeStatsTable
+						title="longest completed runtime"
+						items={stats.longestRuntime}
+						emptyMessage="No average_episode_duration data. Add it to your /api/animes fields."
+					/>
+
+					<RewatchStatsTable
+						title="top rewatches"
+						items={stats.topRewatches}
+						emptyMessage="No anime have been rewatched."
 					/>
 
 					<StatsTable
@@ -156,12 +163,6 @@
 						labelHeader="tag"
 						valueHeader="uses"
 						emptyMessage="No MAL tags found."
-					/>
-
-					<RuntimeStatsTable
-						title="longest completed runtime"
-						items={stats.longestRuntime}
-						emptyMessage="No average_episode_duration data. Add it to your /api/animes fields."
 					/>
 				</div>
 

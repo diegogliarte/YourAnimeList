@@ -19,11 +19,27 @@ export type RuntimeAnimeStat = {
 	title: string;
 	episodes: number;
 	watchedEpisodes: number;
+	numberOfTimesRewatched: number;
+	totalWatches: number;
 	episodeDurationSeconds: number;
 	totalRuntimeSeconds: number;
 	watchedRuntimeSeconds: number;
 	totalRuntimeLabel: string;
 	watchedRuntimeLabel: string;
+};
+
+export type RewatchAnimeStat = {
+	id: Anime['id'];
+	title: string;
+	score: string;
+	numberOfTimesRewatched: number;
+	totalWatches: number;
+	totalEpisodes: number;
+	baseWatchedEpisodes: number;
+	effectiveWatchedEpisodes: number;
+	averageEpisodeDurationSeconds: number | null;
+	effectiveWatchedRuntimeSeconds: number | null;
+	effectiveWatchedRuntimeLabel: string;
 };
 
 export type GenreStat = {
@@ -49,6 +65,7 @@ export type AnimeStats = {
 	genreStats: GenreStat[];
 	bestGenres: GenreStat[];
 	longestRuntime: RuntimeAnimeStat[];
+	topRewatches: RewatchAnimeStat[];
 };
 
 const STATUS_LABELS: Record<ApiAnimeStatus, string> = {
@@ -68,7 +85,6 @@ const EPISODE_BUCKETS = [
 	{ label: '53-99', min: 53, max: 99 },
 	{ label: '100+', min: 100, max: Number.POSITIVE_INFINITY }
 ];
-
 
 const normalizeMediaType = (mediaType: string | null | undefined) => {
 	if (!mediaType) return 'unknown';
@@ -99,8 +115,8 @@ const formatSignedDecimal = (value: number, digits = 2) => {
 	return '0';
 };
 
-const formatDuration = (seconds: number) => {
-	if (!Number.isFinite(seconds) || seconds <= 0) return '—';
+const formatDuration = (seconds: number | null | undefined) => {
+	if (!seconds || !Number.isFinite(seconds) || seconds <= 0) return '—';
 
 	const minutes = seconds / 60;
 	const hours = seconds / 3600;
@@ -148,6 +164,20 @@ const toSortedChartData = <T extends string | number>(
 	return typeof limit === 'number' ? items.slice(0, limit) : items;
 };
 
+const getRewatchCount = (anime: Anime) => {
+	const rewatches = anime.numberOfTimesRewatched ?? 0;
+
+	if (!Number.isFinite(rewatches) || rewatches <= 0) {
+		return 0;
+	}
+
+	return Math.trunc(rewatches);
+};
+
+const getWatchMultiplier = (anime: Anime) => {
+	return 1 + getRewatchCount(anime);
+};
+
 const getTotalEpisodes = (anime: Anime) => {
 	if (typeof anime.totalEpisodes === 'number' && anime.totalEpisodes > 0) {
 		return anime.totalEpisodes;
@@ -181,6 +211,10 @@ const getWatchedEpisodes = (anime: Anime) => {
 	return Math.min(watchedEpisodes, totalEpisodes);
 };
 
+const getEffectiveWatchedEpisodes = (anime: Anime) => {
+	return getWatchedEpisodes(anime) * getWatchMultiplier(anime);
+};
+
 const getAverageEpisodeDurationSeconds = (anime: Anime) => {
 	const value = anime.averageEpisodeDuration;
 
@@ -189,6 +223,28 @@ const getAverageEpisodeDurationSeconds = (anime: Anime) => {
 	}
 
 	return value;
+};
+
+const getEffectiveWatchedRuntimeSeconds = (anime: Anime) => {
+	const watchedEpisodes = getEffectiveWatchedEpisodes(anime);
+	const episodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
+
+	if (!watchedEpisodes || !episodeDurationSeconds) {
+		return null;
+	}
+
+	return watchedEpisodes * episodeDurationSeconds;
+};
+
+const getUniqueTotalRuntimeSeconds = (anime: Anime) => {
+	const totalEpisodes = getTotalEpisodes(anime);
+	const episodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
+
+	if (!totalEpisodes || !episodeDurationSeconds) {
+		return null;
+	}
+
+	return totalEpisodes * episodeDurationSeconds;
 };
 
 const getUserScore = (anime: Anime) => {
@@ -208,14 +264,11 @@ const getYear = (anime: Anime) => {
 };
 
 const getGenres = (anime: Anime) => {
-	return anime.genres
-		.map((genre) => genre.name.trim())
-		.filter(Boolean);
+	return anime.genres.map((genre) => genre.name.trim()).filter(Boolean);
 };
 
 const getTags = (anime: Anime) => {
-	return anime.tags
-		.map((tag) => tag.trim().toLowerCase());
+	return anime.tags.map((tag) => tag.trim().toLowerCase());
 };
 
 const getStandardDeviation = (values: number[]) => {
@@ -239,20 +292,51 @@ const buildRuntimeRow = (anime: Anime): RuntimeAnimeStat | null => {
 		return null;
 	}
 
-	const watchedEpisodes = getWatchedEpisodes(anime);
+	const watchedEpisodes = getEffectiveWatchedEpisodes(anime);
 	const totalRuntimeSeconds = episodes * episodeDurationSeconds;
 	const watchedRuntimeSeconds = watchedEpisodes * episodeDurationSeconds;
+	const numberOfTimesRewatched = getRewatchCount(anime);
 
 	return {
 		id: anime.id,
 		title: anime.title,
 		episodes,
 		watchedEpisodes,
+		numberOfTimesRewatched,
+		totalWatches: getWatchMultiplier(anime),
 		episodeDurationSeconds,
 		totalRuntimeSeconds,
 		watchedRuntimeSeconds,
 		totalRuntimeLabel: formatDuration(totalRuntimeSeconds),
 		watchedRuntimeLabel: formatDuration(watchedRuntimeSeconds)
+	};
+};
+
+const buildRewatchRow = (anime: Anime): RewatchAnimeStat | null => {
+	const numberOfTimesRewatched = getRewatchCount(anime);
+
+	if (numberOfTimesRewatched <= 0) {
+		return null;
+	}
+
+	const totalEpisodes = getTotalEpisodes(anime);
+	const baseWatchedEpisodes = getWatchedEpisodes(anime);
+	const effectiveWatchedEpisodes = getEffectiveWatchedEpisodes(anime);
+	const averageEpisodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
+	const effectiveWatchedRuntimeSeconds = getEffectiveWatchedRuntimeSeconds(anime);
+
+	return {
+		id: anime.id,
+		title: anime.title,
+		score: anime.displayScore || String(anime.score || '—'),
+		numberOfTimesRewatched,
+		totalWatches: getWatchMultiplier(anime),
+		totalEpisodes,
+		baseWatchedEpisodes,
+		effectiveWatchedEpisodes,
+		averageEpisodeDurationSeconds,
+		effectiveWatchedRuntimeSeconds,
+		effectiveWatchedRuntimeLabel: formatDuration(effectiveWatchedRuntimeSeconds)
 	};
 };
 
@@ -265,10 +349,7 @@ type GenreAccumulator = {
 	runtimeSeconds: number;
 };
 
-const getOrCreateGenreAccumulator = (
-	map: Map<string, GenreAccumulator>,
-	genre: string
-) => {
+const getOrCreateGenreAccumulator = (map: Map<string, GenreAccumulator>, genre: string) => {
 	const existing = map.get(genre);
 
 	if (existing) return existing;
@@ -327,8 +408,10 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 	let watchedRuntimeSeconds = 0;
 	let watchedRuntimeEntries = 0;
 
-	let completedEpisodeTotal = 0;
-	let completedRuntimeSeconds = 0;
+	let uniqueCompletedEpisodeTotal = 0;
+	let effectiveCompletedEpisodeTotal = 0;
+	let uniqueCompletedRuntimeSeconds = 0;
+	let effectiveCompletedRuntimeSeconds = 0;
 	let completedRuntimeEntries = 0;
 
 	let completedScoreTotal = 0;
@@ -336,8 +419,12 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 	let completedMeanGapTotal = 0;
 	let completedMeanGapCount = 0;
 
+	let rewatchedEntryCount = 0;
+	let totalRewatchCount = 0;
+
 	const completedScores: number[] = [];
 	const completedRuntimeRows: RuntimeAnimeStat[] = [];
+	const rewatchRows: RewatchAnimeStat[] = [];
 
 	for (const option of EXCLUDE_STATUS_OPTIONS) {
 		statusMap.set(option.value, 0);
@@ -353,13 +440,26 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		if (anime.status === 'dropped') droppedCount += 1;
 		if (anime.status === 'plan_to_watch') plannedCount += 1;
 
-		const watchedEpisodes = getWatchedEpisodes(anime);
-		const episodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
+		const rewatchCount = getRewatchCount(anime);
 
-		watchedEpisodeTotal += watchedEpisodes;
+		if (rewatchCount > 0) {
+			rewatchedEntryCount += 1;
+			totalRewatchCount += rewatchCount;
 
-		if (watchedEpisodes > 0 && episodeDurationSeconds) {
-			watchedRuntimeSeconds += watchedEpisodes * episodeDurationSeconds;
+			const rewatchRow = buildRewatchRow(anime);
+
+			if (rewatchRow) {
+				rewatchRows.push(rewatchRow);
+			}
+		}
+
+		const effectiveWatchedEpisodes = getEffectiveWatchedEpisodes(anime);
+		const effectiveWatchedRuntime = getEffectiveWatchedRuntimeSeconds(anime);
+
+		watchedEpisodeTotal += effectiveWatchedEpisodes;
+
+		if (effectiveWatchedEpisodes > 0 && effectiveWatchedRuntime !== null) {
+			watchedRuntimeSeconds += effectiveWatchedRuntime;
 			watchedRuntimeEntries += 1;
 		}
 	}
@@ -392,7 +492,10 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		}
 
 		const totalEpisodes = getTotalEpisodes(anime);
-		completedEpisodeTotal += totalEpisodes;
+		const effectiveWatchedEpisodes = getEffectiveWatchedEpisodes(anime);
+
+		uniqueCompletedEpisodeTotal += totalEpisodes;
+		effectiveCompletedEpisodeTotal += effectiveWatchedEpisodes;
 
 		if (totalEpisodes > 0) {
 			const bucket = EPISODE_BUCKETS.find((item) => {
@@ -409,9 +512,12 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		}
 
 		const runtimeRow = buildRuntimeRow(anime);
+		const uniqueRuntime = getUniqueTotalRuntimeSeconds(anime);
+		const effectiveRuntime = getEffectiveWatchedRuntimeSeconds(anime);
 
-		if (runtimeRow) {
-			completedRuntimeSeconds += runtimeRow.totalRuntimeSeconds;
+		if (runtimeRow && uniqueRuntime !== null && effectiveRuntime !== null) {
+			uniqueCompletedRuntimeSeconds += uniqueRuntime;
+			effectiveCompletedRuntimeSeconds += effectiveRuntime;
 			completedRuntimeEntries += 1;
 			completedRuntimeRows.push(runtimeRow);
 		}
@@ -424,15 +530,15 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 			const genreAccumulator = getOrCreateGenreAccumulator(genreAccumulatorMap, genre);
 
 			genreAccumulator.count += 1;
-			genreAccumulator.episodes += totalEpisodes;
+			genreAccumulator.episodes += effectiveWatchedEpisodes;
 
 			if (score !== null) {
 				genreAccumulator.ratedCount += 1;
 				genreAccumulator.scoreTotal += score;
 			}
 
-			if (runtimeRow) {
-				genreAccumulator.runtimeSeconds += runtimeRow.totalRuntimeSeconds;
+			if (effectiveRuntime !== null) {
+				genreAccumulator.runtimeSeconds += effectiveRuntime;
 			}
 		}
 	}
@@ -443,7 +549,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 	const scoreStandardDeviation = getStandardDeviation(completedScores);
 
 	const averageCompletedEpisodes =
-		completedTotal > 0 ? completedEpisodeTotal / completedTotal : 0;
+		completedTotal > 0 ? effectiveCompletedEpisodeTotal / completedTotal : 0;
 
 	const averageMeanGap =
 		completedMeanGapCount > 0 ? completedMeanGapTotal / completedMeanGapCount : 0;
@@ -461,6 +567,21 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		})
 		.slice(0, 12);
 
+	const topRewatches = rewatchRows
+		.sort((a, b) => {
+			const rewatchDiff = b.numberOfTimesRewatched - a.numberOfTimesRewatched;
+
+			if (rewatchDiff !== 0) return rewatchDiff;
+
+			const runtimeDiff =
+				(b.effectiveWatchedRuntimeSeconds ?? 0) - (a.effectiveWatchedRuntimeSeconds ?? 0);
+
+			if (runtimeDiff !== 0) return runtimeDiff;
+
+			return a.title.localeCompare(b.title);
+		})
+		.slice(0, 10);
+
 	const cards: StatCardValue[] = [
 		{
 			label: 'entries',
@@ -470,7 +591,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		{
 			label: 'eps watched',
 			value: formatNumber(watchedEpisodeTotal),
-			help: 'all statuses'
+			help: 'includes rewatches'
 		},
 		{
 			label: 'watched time',
@@ -499,13 +620,13 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		},
 		{
 			label: 'completed eps',
-			value: formatNumber(completedEpisodeTotal),
-			help: `${formatDecimal(averageCompletedEpisodes, 1)} avg`
+			value: formatNumber(effectiveCompletedEpisodeTotal),
+			help: `${formatNumber(uniqueCompletedEpisodeTotal)} unique`
 		},
 		{
 			label: 'completed runtime',
-			value: formatDuration(completedRuntimeSeconds),
-			help: `${formatNumber(completedRuntimeEntries)} with duration`
+			value: formatDuration(effectiveCompletedRuntimeSeconds),
+			help: `${formatDuration(uniqueCompletedRuntimeSeconds)} unique`
 		},
 		{
 			label: 'genres',
@@ -516,6 +637,11 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 			label: 'runtime coverage',
 			value: toPercentage(completedRuntimeEntries, completedTotal),
 			help: 'completed with duration'
+		},
+		{
+			label: 'rewatchers',
+			value: formatNumber(rewatchedEntryCount),
+			help: `${formatNumber(totalRewatchCount)} extra watches`
 		},
 		{
 			label: 'dropped',
@@ -575,7 +701,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 
 			return a.title.localeCompare(b.title);
 		})
-		.slice(0, 8);
+		.slice(0, 12);
 
 	return {
 		cards,
@@ -588,6 +714,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		topTags,
 		genreStats: genreStats.slice(0, 12),
 		bestGenres,
-		longestRuntime
+		longestRuntime,
+		topRewatches
 	};
 };
