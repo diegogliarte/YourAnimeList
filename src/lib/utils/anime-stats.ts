@@ -65,7 +65,8 @@ const EPISODE_BUCKETS = [
 	{ label: '7-13', min: 7, max: 13 },
 	{ label: '14-26', min: 14, max: 26 },
 	{ label: '27-52', min: 27, max: 52 },
-	{ label: '53+', min: 53, max: Number.POSITIVE_INFINITY }
+	{ label: '53-99', min: 53, max: 99 },
+	{ label: '100+', min: 100, max: Number.POSITIVE_INFINITY }
 ];
 
 
