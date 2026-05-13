@@ -463,13 +463,8 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 	const cards: StatCardValue[] = [
 		{
 			label: 'entries',
-			value: formatNumber(totalEntries),
-			help: `${formatNumber(completedTotal)} completed`
-		},
-		{
-			label: 'completion',
-			value: toPercentage(completedTotal, totalEntries),
-			help: `${formatNumber(plannedCount)} planned`
+			value: formatNumber(completedTotal),
+			help: `${formatNumber(totalEntries)} total entries`
 		},
 		{
 			label: 'eps watched',
@@ -485,6 +480,11 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 			label: 'avg score',
 			value: completedRatedCount > 0 ? formatDecimal(averageCompletedScore, 2) : '—',
 			help: `${formatNumber(completedRatedCount)} completed rated`
+		},
+		{
+			label: 'completion',
+			value: toPercentage(completedTotal, totalEntries),
+			help: `${formatNumber(plannedCount)} planned`
 		},
 		{
 			label: 'score spread',
