@@ -3,11 +3,17 @@ import { env } from '$env/dynamic/private';
 import type {
 	Anime,
 	AnimeApiResponse,
+	AnimeGenre,
 	AnimeRankingApiResponse,
 	AnimeRankingType,
 	ApiAnimeStatus,
 	RankedAnime
 } from '$lib/types/anime';
+
+type MalGenre = {
+	id: number;
+	name: string;
+};
 
 type MalAnimeNode = {
 	id: number;
@@ -27,6 +33,7 @@ type MalAnimeNode = {
 		year?: number;
 		season?: string;
 	};
+	genres?: MalGenre[];
 };
 
 type MalListStatus = {
@@ -77,7 +84,8 @@ const ANIME_LIST_FIELDS = [
 	'average_episode_duration',
 	'media_type',
 	'status',
-	'start_season'
+	'start_season',
+	'genres'
 ].join(',');
 
 const ANIME_RANKING_FIELDS = [
@@ -89,7 +97,8 @@ const ANIME_RANKING_FIELDS = [
 	'average_episode_duration',
 	'media_type',
 	'status',
-	'start_season'
+	'start_season',
+	'genres'
 ].join(',');
 
 const ANIME_STATUS_VALUES: ApiAnimeStatus[] = [
@@ -177,6 +186,17 @@ const normalizeTags = (rawTags?: string[] | string): string[] => {
 		.filter(Boolean);
 };
 
+const normalizeGenres = (genres?: MalGenre[]): AnimeGenre[] => {
+	if (!genres) return [];
+
+	return genres
+		.filter((genre) => genre.name?.trim())
+		.map((genre) => ({
+			id: genre.id,
+			name: genre.name.trim()
+		}));
+};
+
 const getScoreModifier = (tags: string[]) => {
 	const normalizedTags = tags.map((tag) => tag.toLowerCase());
 
@@ -247,7 +267,7 @@ const fetchMalJson = async <T>(url: string, clientId: string): Promise<T> => {
 
 			detail = payload.message || payload.error || '';
 		} catch {
-			// MAL sometimes returns an empty/non-JSON error body.
+			// MAL sometimes returns empty/non-JSON error bodies.
 		}
 
 		throw new Error(
@@ -280,6 +300,7 @@ const mapAnimeEntry = (entry: MalAnimeEntry): Anime => {
 		mediaType: entry.node.media_type ?? null,
 		animeStatus: entry.node.status ?? null,
 		startSeason: entry.node.start_season ?? null,
+		genres: normalizeGenres(entry.node.genres),
 		tags
 	};
 };
@@ -292,13 +313,15 @@ const mapRankingEntry = (
 		id: entry.node.id,
 		title: entry.node.title,
 		image: getImage(entry.node),
-		rank: entry.node.rank ?? entry.ranking?.rank ?? null,
+		rank: entry.ranking?.rank ?? entry.node.rank ?? null,
 		popularity: entry.node.popularity ?? null,
 		mean: entry.node.mean ?? null,
 		totalEpisodes: entry.node.num_episodes ?? null,
+		averageEpisodeDuration: entry.node.average_episode_duration ?? null,
 		mediaType: entry.node.media_type ?? null,
 		animeStatus: entry.node.status ?? null,
 		startSeason: entry.node.start_season ?? null,
+		genres: normalizeGenres(entry.node.genres),
 		userStatus
 	};
 };

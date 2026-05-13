@@ -20,6 +20,16 @@ export type AnimeRankingType =
 	| 'bypopularity'
 	| 'favorite';
 
+export type AnimeGenre = {
+	id: number;
+	name: string;
+};
+
+export type AnimeSeason = {
+	year?: number;
+	season?: string;
+};
+
 export type Anime = {
 	id: number;
 	title: string;
@@ -30,22 +40,13 @@ export type Anime = {
 	status: ApiAnimeStatus;
 	episodesWatched: number;
 	totalEpisodes: number | null;
+	averageEpisodeDuration: number | null;
 	mean: number | null;
 	mediaType: string | null;
 	animeStatus: string | null;
-	startSeason: {
-		year?: number;
-		season?: string;
-	} | null;
-	averageEpisodeDuration: number | null;
+	startSeason: AnimeSeason | null;
+	genres: AnimeGenre[];
 	tags: string[];
-};
-
-export type AnimeApiResponse = {
-	username: string;
-	status: ApiAnimeStatus | 'all';
-	count: number;
-	animes: Anime[];
 };
 
 export type RankedAnime = {
@@ -56,13 +57,19 @@ export type RankedAnime = {
 	popularity: number | null;
 	mean: number | null;
 	totalEpisodes: number | null;
+	averageEpisodeDuration: number | null;
 	mediaType: string | null;
 	animeStatus: string | null;
-	startSeason: {
-		year?: number;
-		season?: string;
-	} | null;
+	startSeason: AnimeSeason | null;
+	genres: AnimeGenre[];
 	userStatus: ApiAnimeStatus | null;
+};
+
+export type AnimeApiResponse = {
+	username: string;
+	status: ApiAnimeStatus | 'all';
+	count: number;
+	animes: Anime[];
 };
 
 export type AnimeRankingApiResponse = {

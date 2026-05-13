@@ -5,6 +5,7 @@
 
 	import AnimeHeader from '$lib/components/anime/AnimeHeader.svelte';
 	import BarChart from '$lib/components/stats/BarChart.svelte';
+	import GenreStatsTable from '$lib/components/stats/GenreStatsTable.svelte';
 	import RuntimeStatsTable from '$lib/components/stats/RuntimeStatsTable.svelte';
 	import StatCard from '$lib/components/stats/StatCard.svelte';
 	import StatsTable from '$lib/components/stats/StatsTable.svelte';
@@ -127,7 +128,7 @@
 			</div>
 
 			<div class="space-y-2 p-2 sm:p-3">
-				<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+				<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
 					{#each stats.cards as card (card.label)}
 						<StatCard {...card} />
 					{/each}
@@ -136,11 +137,12 @@
 				<div class="grid gap-2 lg:grid-cols-2">
 					<BarChart title="status" items={stats.statusDistribution} />
 					<BarChart title="completed scores" items={stats.scoreDistribution} />
+					<BarChart title="completed genres" items={stats.genreDistribution} />
 					<BarChart title="completed media" items={stats.mediaTypeDistribution} />
 					<BarChart title="completed episodes" items={stats.episodeDistribution} />
 				</div>
 
-				<div class="grid gap-2 lg:grid-cols-2">
+				<div class="grid gap-2 lg:grid-cols-3">
 					<StatsTable
 						title="completed years"
 						items={stats.topYears}
@@ -160,6 +162,20 @@
 						title="longest completed runtime"
 						items={stats.longestRuntime}
 						emptyMessage="No average_episode_duration data. Add it to your /api/animes fields."
+					/>
+				</div>
+
+				<div class="grid gap-2 lg:grid-cols-2">
+					<GenreStatsTable
+						title="genre breakdown"
+						items={stats.genreStats}
+						emptyMessage="No genre data. Add genres to your /api/animes fields."
+					/>
+
+					<GenreStatsTable
+						title="highest rated genres"
+						items={stats.bestGenres}
+						emptyMessage="No genres with at least 3 rated completed entries."
 					/>
 				</div>
 			</div>

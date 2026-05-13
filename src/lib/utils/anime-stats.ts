@@ -26,21 +26,29 @@ export type RuntimeAnimeStat = {
 	watchedRuntimeLabel: string;
 };
 
+export type GenreStat = {
+	genre: string;
+	count: number;
+	ratedCount: number;
+	episodes: number;
+	runtimeSeconds: number;
+	averageScore: number | null;
+	averageScoreLabel: string;
+	runtimeLabel: string;
+};
+
 export type AnimeStats = {
 	cards: StatCardValue[];
 	statusDistribution: ChartDatum[];
 	scoreDistribution: ChartDatum[];
 	mediaTypeDistribution: ChartDatum[];
 	episodeDistribution: ChartDatum[];
+	genreDistribution: ChartDatum[];
 	topYears: ChartDatum[];
 	topTags: ChartDatum[];
+	genreStats: GenreStat[];
+	bestGenres: GenreStat[];
 	longestRuntime: RuntimeAnimeStat[];
-};
-
-type AnimeWithRuntime = Anime & {
-	averageEpisodeDuration?: number | null;
-	averageEpisodeDurationSeconds?: number | null;
-	durationSeconds?: number | null;
 };
 
 const STATUS_LABELS: Record<ApiAnimeStatus, string> = {
@@ -57,9 +65,9 @@ const EPISODE_BUCKETS = [
 	{ label: '7-13', min: 7, max: 13 },
 	{ label: '14-26', min: 14, max: 26 },
 	{ label: '27-52', min: 27, max: 52 },
-	{ label: '53+', min: 53, max: 99 },
-	{ label: '100+', min: 100, max: Number.POSITIVE_INFINITY }
+	{ label: '53+', min: 53, max: Number.POSITIVE_INFINITY }
 ];
+
 
 const normalizeMediaType = (mediaType: string | null | undefined) => {
 	if (!mediaType) return 'unknown';
@@ -81,6 +89,15 @@ const toPercentage = (value: number, total: number) => {
 	return `${formatDecimal((value / total) * 100)}%`;
 };
 
+const formatSignedDecimal = (value: number, digits = 2) => {
+	const formatted = formatDecimal(Math.abs(value), digits);
+
+	if (value > 0) return `+${formatted}`;
+	if (value < 0) return `-${formatted}`;
+
+	return '0';
+};
+
 const formatDuration = (seconds: number) => {
 	if (!Number.isFinite(seconds) || seconds <= 0) return '—';
 
@@ -89,11 +106,11 @@ const formatDuration = (seconds: number) => {
 	const days = hours / 24;
 
 	if (days >= 1) {
-		return `${formatDecimal(days)}d`;
+		return `${formatDecimal(days, 1)}d`;
 	}
 
 	if (hours >= 1) {
-		return `${formatDecimal(hours)}h`;
+		return `${formatDecimal(hours, 1)}h`;
 	}
 
 	return `${Math.round(minutes)}m`;
@@ -164,13 +181,7 @@ const getWatchedEpisodes = (anime: Anime) => {
 };
 
 const getAverageEpisodeDurationSeconds = (anime: Anime) => {
-	const runtimeAnime = anime as AnimeWithRuntime;
-
-	const value =
-		runtimeAnime.averageEpisodeDuration ??
-		runtimeAnime.averageEpisodeDurationSeconds ??
-		runtimeAnime.durationSeconds ??
-		null;
+	const value = anime.averageEpisodeDuration;
 
 	if (typeof value !== 'number' || value <= 0) {
 		return null;
@@ -179,12 +190,12 @@ const getAverageEpisodeDurationSeconds = (anime: Anime) => {
 	return value;
 };
 
-const getScore = (anime: Anime) => {
-	return anime.score && anime.score > 0 ? anime.score : null;
+const getUserScore = (anime: Anime) => {
+	return anime.score > 0 ? anime.score : null;
 };
 
 const getIntegerScore = (anime: Anime) => {
-	const score = getScore(anime);
+	const score = getUserScore(anime);
 
 	if (!score) return null;
 
@@ -195,8 +206,28 @@ const getYear = (anime: Anime) => {
 	return anime.startSeason?.year ?? null;
 };
 
+const getGenres = (anime: Anime) => {
+	return anime.genres
+		.map((genre) => genre.name.trim())
+		.filter(Boolean);
+};
+
 const getTags = (anime: Anime) => {
-	return Array.isArray(anime.tags) ? anime.tags : [];
+	return anime.tags
+		.map((tag) => tag.trim().toLowerCase());
+};
+
+const getStandardDeviation = (values: number[]) => {
+	if (values.length === 0) return 0;
+
+	const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+
+	const variance =
+		values.reduce((sum, value) => {
+			return sum + (value - mean) ** 2;
+		}, 0) / values.length;
+
+	return Math.sqrt(variance);
 };
 
 const buildRuntimeRow = (anime: Anime): RuntimeAnimeStat | null => {
@@ -224,6 +255,56 @@ const buildRuntimeRow = (anime: Anime): RuntimeAnimeStat | null => {
 	};
 };
 
+type GenreAccumulator = {
+	genre: string;
+	count: number;
+	ratedCount: number;
+	scoreTotal: number;
+	episodes: number;
+	runtimeSeconds: number;
+};
+
+const getOrCreateGenreAccumulator = (
+	map: Map<string, GenreAccumulator>,
+	genre: string
+) => {
+	const existing = map.get(genre);
+
+	if (existing) return existing;
+
+	const created: GenreAccumulator = {
+		genre,
+		count: 0,
+		ratedCount: 0,
+		scoreTotal: 0,
+		episodes: 0,
+		runtimeSeconds: 0
+	};
+
+	map.set(genre, created);
+
+	return created;
+};
+
+const buildGenreStats = (map: Map<string, GenreAccumulator>): GenreStat[] => {
+	return [...map.values()]
+		.map((item) => {
+			const averageScore = item.ratedCount > 0 ? item.scoreTotal / item.ratedCount : null;
+
+			return {
+				genre: item.genre,
+				count: item.count,
+				ratedCount: item.ratedCount,
+				episodes: item.episodes,
+				runtimeSeconds: item.runtimeSeconds,
+				averageScore,
+				averageScoreLabel: averageScore === null ? '—' : formatDecimal(averageScore, 2),
+				runtimeLabel: formatDuration(item.runtimeSeconds)
+			};
+		})
+		.sort((a, b) => b.count - a.count || a.genre.localeCompare(b.genre));
+};
+
 export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 	const totalEntries = animes.length;
 	const completedAnimes = animes.filter((anime) => anime.status === 'completed');
@@ -235,17 +316,26 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 	const episodeBucketMap = new Map<string, number>();
 	const yearMap = new Map<number, number>();
 	const tagMap = new Map<string, number>();
+	const genreMap = new Map<string, number>();
+	const genreAccumulatorMap = new Map<string, GenreAccumulator>();
 
-	let ratedCompletedCount = 0;
-	let completedScoreTotal = 0;
 	let droppedCount = 0;
 	let plannedCount = 0;
 
+	let watchedEpisodeTotal = 0;
 	let watchedRuntimeSeconds = 0;
 	let watchedRuntimeEntries = 0;
+
+	let completedEpisodeTotal = 0;
 	let completedRuntimeSeconds = 0;
 	let completedRuntimeEntries = 0;
 
+	let completedScoreTotal = 0;
+	let completedRatedCount = 0;
+	let completedMeanGapTotal = 0;
+	let completedMeanGapCount = 0;
+
+	const completedScores: number[] = [];
 	const completedRuntimeRows: RuntimeAnimeStat[] = [];
 
 	for (const option of EXCLUDE_STATUS_OPTIONS) {
@@ -262,10 +352,12 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		if (anime.status === 'dropped') droppedCount += 1;
 		if (anime.status === 'plan_to_watch') plannedCount += 1;
 
-		const episodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
 		const watchedEpisodes = getWatchedEpisodes(anime);
+		const episodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
 
-		if (episodeDurationSeconds && watchedEpisodes > 0) {
+		watchedEpisodeTotal += watchedEpisodes;
+
+		if (watchedEpisodes > 0 && episodeDurationSeconds) {
 			watchedRuntimeSeconds += watchedEpisodes * episodeDurationSeconds;
 			watchedRuntimeEntries += 1;
 		}
@@ -274,12 +366,18 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 	for (const anime of completedAnimes) {
 		increment(mediaTypeMap, normalizeMediaType(anime.mediaType));
 
-		const score = getScore(anime);
+		const score = getUserScore(anime);
 		const integerScore = getIntegerScore(anime);
 
 		if (score !== null) {
-			ratedCompletedCount += 1;
+			completedRatedCount += 1;
 			completedScoreTotal += score;
+			completedScores.push(score);
+		}
+
+		if (score !== null && typeof anime.mean === 'number' && anime.mean > 0) {
+			completedMeanGapTotal += score - anime.mean;
+			completedMeanGapCount += 1;
 		}
 
 		if (integerScore !== null) {
@@ -293,6 +391,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		}
 
 		const totalEpisodes = getTotalEpisodes(anime);
+		completedEpisodeTotal += totalEpisodes;
 
 		if (totalEpisodes > 0) {
 			const bucket = EPISODE_BUCKETS.find((item) => {
@@ -305,11 +404,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		}
 
 		for (const tag of getTags(anime)) {
-			const normalizedTag = tag.trim().toLowerCase();
-
-			if (normalizedTag) {
-				increment(tagMap, normalizedTag);
-			}
+			increment(tagMap, tag);
 		}
 
 		const runtimeRow = buildRuntimeRow(anime);
@@ -319,10 +414,51 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 			completedRuntimeEntries += 1;
 			completedRuntimeRows.push(runtimeRow);
 		}
+
+		const genres = getGenres(anime);
+
+		for (const genre of genres) {
+			increment(genreMap, genre);
+
+			const genreAccumulator = getOrCreateGenreAccumulator(genreAccumulatorMap, genre);
+
+			genreAccumulator.count += 1;
+			genreAccumulator.episodes += totalEpisodes;
+
+			if (score !== null) {
+				genreAccumulator.ratedCount += 1;
+				genreAccumulator.scoreTotal += score;
+			}
+
+			if (runtimeRow) {
+				genreAccumulator.runtimeSeconds += runtimeRow.totalRuntimeSeconds;
+			}
+		}
 	}
 
 	const averageCompletedScore =
-		ratedCompletedCount > 0 ? completedScoreTotal / ratedCompletedCount : 0;
+		completedRatedCount > 0 ? completedScoreTotal / completedRatedCount : 0;
+
+	const scoreStandardDeviation = getStandardDeviation(completedScores);
+
+	const averageCompletedEpisodes =
+		completedTotal > 0 ? completedEpisodeTotal / completedTotal : 0;
+
+	const averageMeanGap =
+		completedMeanGapCount > 0 ? completedMeanGapTotal / completedMeanGapCount : 0;
+
+	const genreStats = buildGenreStats(genreAccumulatorMap);
+
+	const bestGenres = [...genreStats]
+		.filter((genre) => genre.ratedCount >= 3 && genre.averageScore !== null)
+		.sort((a, b) => {
+			const scoreDiff = (b.averageScore ?? 0) - (a.averageScore ?? 0);
+
+			if (scoreDiff !== 0) return scoreDiff;
+
+			return b.count - a.count || a.genre.localeCompare(b.genre);
+		})
+		.slice(0, 12);
 
 	const cards: StatCardValue[] = [
 		{
@@ -336,19 +472,49 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 			help: `${formatNumber(plannedCount)} planned`
 		},
 		{
-			label: 'avg score',
-			value: ratedCompletedCount > 0 ? formatDecimal(averageCompletedScore, 2) : '—',
-			help: `${formatNumber(ratedCompletedCount)} completed rated`
+			label: 'eps watched',
+			value: formatNumber(watchedEpisodeTotal),
+			help: 'all statuses'
 		},
 		{
 			label: 'watched time',
 			value: formatDuration(watchedRuntimeSeconds),
-			help: `${formatNumber(watchedRuntimeEntries)} entries with watched eps`
+			help: `${formatNumber(watchedRuntimeEntries)} entries with duration`
+		},
+		{
+			label: 'avg score',
+			value: completedRatedCount > 0 ? formatDecimal(averageCompletedScore, 2) : '—',
+			help: `${formatNumber(completedRatedCount)} completed rated`
+		},
+		{
+			label: 'score spread',
+			value: completedScores.length > 0 ? formatDecimal(scoreStandardDeviation, 2) : '—',
+			help: 'standard deviation'
+		},
+		{
+			label: 'vs MAL mean',
+			value: completedMeanGapCount > 0 ? formatSignedDecimal(averageMeanGap, 2) : '—',
+			help: `${formatNumber(completedMeanGapCount)} comparable`
+		},
+		{
+			label: 'completed eps',
+			value: formatNumber(completedEpisodeTotal),
+			help: `${formatDecimal(averageCompletedEpisodes, 1)} avg`
 		},
 		{
 			label: 'completed runtime',
 			value: formatDuration(completedRuntimeSeconds),
-			help: `${formatNumber(completedRuntimeEntries)} completed with duration`
+			help: `${formatNumber(completedRuntimeEntries)} with duration`
+		},
+		{
+			label: 'genres',
+			value: formatNumber(genreStats.length),
+			help: 'completed entries'
+		},
+		{
+			label: 'runtime coverage',
+			value: toPercentage(completedRuntimeEntries, completedTotal),
+			help: 'completed with duration'
 		},
 		{
 			label: 'dropped',
@@ -370,7 +536,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		return {
 			label: String(score),
 			value,
-			detail: toPercentage(value, ratedCompletedCount)
+			detail: toPercentage(value, completedRatedCount)
 		};
 	});
 
@@ -384,6 +550,11 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		value,
 		detail: toPercentage(value, completedTotal)
 	}));
+
+	const genreDistribution = toSortedChartData(genreMap, {
+		total: completedTotal,
+		limit: 10
+	});
 
 	const topYears = toSortedChartData(yearMap, {
 		total: completedTotal,
@@ -411,8 +582,11 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		scoreDistribution,
 		mediaTypeDistribution,
 		episodeDistribution,
+		genreDistribution,
 		topYears,
 		topTags,
+		genreStats: genreStats.slice(0, 12),
+		bestGenres,
 		longestRuntime
 	};
 };
