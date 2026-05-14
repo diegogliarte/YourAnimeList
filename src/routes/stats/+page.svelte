@@ -5,11 +5,8 @@
 
 	import AnimeHeader from '$lib/components/anime/AnimeHeader.svelte';
 	import BarChart from '$lib/components/stats/BarChart.svelte';
-	import GenreStatsTable from '$lib/components/stats/GenreStatsTable.svelte';
-	import RuntimeStatsTable from '$lib/components/stats/RuntimeStatsTable.svelte';
-	import RewatchStatsTable from '$lib/components/stats/RewatchStatsTable.svelte';
 	import StatCard from '$lib/components/stats/StatCard.svelte';
-	import StatsTable from '$lib/components/stats/StatsTable.svelte';
+	import StatsTable, { type StatsTableRow } from '$lib/components/stats/StatsTable.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
 	import ErrorBanner from '$lib/components/ui/ErrorBanner.svelte';
 	import LoadingState from '$lib/components/ui/LoadingState.svelte';
@@ -23,7 +20,7 @@
 		DEFAULT_STATUS
 	} from '$lib/constants/anime';
 	import { getAnimeCacheContext } from '$lib/state/anime-cache.svelte';
-	import { buildAnimeStats } from '$lib/utils/anime-stats';
+	import { buildAnimeStats, type GenreStat } from '$lib/utils/anime-stats';
 	import { buildAnimeStatsHref, parseAnimeStatsQuery } from '$lib/utils/anime-query';
 
 	const cache = getAnimeCacheContext();
@@ -44,6 +41,47 @@
 	let error = $state<string | null>(null);
 
 	const stats = $derived(listState.data ? buildAnimeStats(listState.data.animes) : null);
+
+	const runtimeRows: StatsTableRow[] = $derived(
+		stats?.longestRuntime.map((item) => ({
+			key: item.id,
+			values: [item.title, item.episodes, item.totalRuntimeLabel]
+		})) ?? []
+	);
+
+	const rewatchRows: StatsTableRow[] = $derived(
+		stats?.topRewatches.map((item) => ({
+			key: item.id,
+			values: [
+				item.title,
+				item.numberOfTimesRewatched,
+				item.effectiveWatchedEpisodes,
+				item.effectiveWatchedRuntimeLabel
+			]
+		})) ?? []
+	);
+
+	const tagRows: StatsTableRow[] = $derived(
+		stats?.topTags.map((item) => ({
+			key: item.label,
+			values: [item.label, item.value]
+		})) ?? []
+	);
+
+	const toGenreRows = (items: GenreStat[]): StatsTableRow[] =>
+		items.map((item) => ({
+			key: item.genre,
+			values: [
+				item.genre,
+				item.count,
+				item.averageScoreLabel,
+				item.episodes,
+				item.runtimeLabel
+			]
+		}));
+
+	const genreRows: StatsTableRow[] = $derived(stats ? toGenreRows(stats.genreStats) : []);
+	const bestGenreRows: StatsTableRow[] = $derived(stats ? toGenreRows(stats.bestGenres) : []);
 
 	const syncUrl = (username = listState.loadedUsername || listState.username, replaceState = true) => {
 		const href = buildAnimeStatsHref({
@@ -145,37 +183,38 @@
 				</div>
 
 				<div class="grid gap-2 lg:grid-cols-2">
-					<RuntimeStatsTable
+					<StatsTable
 						title="longest completed runtime"
-						items={stats.longestRuntime}
+						headers={['title', 'eps', 'total']}
+						rows={runtimeRows}
 						emptyMessage="No average_episode_duration data. Add it to your /api/animes fields."
 					/>
 
-					<RewatchStatsTable
+					<StatsTable
 						title="top rewatches"
-						items={stats.topRewatches}
+						headers={['title', 'rewatches', 'watched eps', 'time']}
+						rows={rewatchRows}
 						emptyMessage="No anime have been rewatched."
 					/>
 
 					<StatsTable
 						title="completed tags"
-						items={stats.topTags}
-						labelHeader="tag"
-						valueHeader="uses"
+						headers={['tag', 'uses']}
+						rows={tagRows}
 						emptyMessage="No MAL tags found."
 					/>
-				</div>
 
-				<div class="grid gap-2 lg:grid-cols-2">
-					<GenreStatsTable
+					<StatsTable
 						title="genre breakdown"
-						items={stats.genreStats}
+						headers={['genre', 'entries', 'avg', 'eps', 'runtime']}
+						rows={genreRows}
 						emptyMessage="No genre data. Add genres to your /api/animes fields."
 					/>
 
-					<GenreStatsTable
+					<StatsTable
 						title="highest rated genres"
-						items={stats.bestGenres}
+						headers={['genre', 'entries', 'avg', 'eps', 'runtime']}
+						rows={bestGenreRows}
 						emptyMessage="No genres with at least 3 rated completed entries."
 					/>
 				</div>
