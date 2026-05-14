@@ -97,13 +97,13 @@ const formatNumber = (value: number) => {
 };
 
 const formatDecimal = (value: number, digits = 1) => {
-	return value.toFixed(digits).replace(/\.?0+$/, '');
+	return value.toFixed(digits);
 };
 
 const toPercentage = (value: number, total: number) => {
-	if (total === 0) return '0%';
+	if (total === 0) return '0.0%';
 
-	return `${formatDecimal((value / total) * 100)}%`;
+	return `${formatDecimal((value / total) * 100, 1)}%`;
 };
 
 const formatSignedDecimal = (value: number, digits = 2) => {

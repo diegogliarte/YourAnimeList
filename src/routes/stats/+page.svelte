@@ -4,7 +4,7 @@
 	import { onMount } from 'svelte';
 
 	import AnimeHeader from '$lib/components/anime/AnimeHeader.svelte';
-	import BarChart from '$lib/components/stats/BarChart.svelte';
+	import BarChart, { type BarChartDetailsByLabel } from '$lib/components/stats/BarChart.svelte';
 	import StatCard from '$lib/components/stats/StatCard.svelte';
 	import StatsTable, { type StatsTableRow } from '$lib/components/stats/StatsTable.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
@@ -22,6 +22,89 @@
 	import { getAnimeCacheContext } from '$lib/state/anime-cache.svelte';
 	import { buildAnimeStats, type GenreStat } from '$lib/utils/anime-stats';
 	import { buildAnimeStatsHref, parseAnimeStatsQuery } from '$lib/utils/anime-query';
+	import type { Anime, ApiAnimeStatus } from '$lib/types/anime';
+
+	const STATUS_LABELS: Record<ApiAnimeStatus, string> = {
+		completed: 'completed',
+		watching: 'watching',
+		on_hold: 'on hold',
+		dropped: 'dropped',
+		plan_to_watch: 'plan to watch'
+	};
+
+	const EPISODE_BUCKETS = [
+		{ label: '1', min: 1, max: 1 },
+		{ label: '2-6', min: 2, max: 6 },
+		{ label: '7-13', min: 7, max: 13 },
+		{ label: '14-26', min: 14, max: 26 },
+		{ label: '27-52', min: 27, max: 52 },
+		{ label: '53-99', min: 53, max: 99 },
+		{ label: '100+', min: 100, max: Number.POSITIVE_INFINITY }
+	];
+
+	const normalizeMediaType = (mediaType: string | null | undefined) => {
+		if (!mediaType) return 'unknown';
+
+		return mediaType.replaceAll('_', ' ').toLowerCase();
+	};
+
+	const getTotalEpisodes = (anime: Anime) => {
+		if (typeof anime.totalEpisodes === 'number' && anime.totalEpisodes > 0) {
+			return anime.totalEpisodes;
+		}
+
+		if (anime.status === 'completed' && typeof anime.episodesWatched === 'number') {
+			return anime.episodesWatched;
+		}
+
+		return 0;
+	};
+
+	const getEpisodeBucketLabel = (anime: Anime) => {
+		const totalEpisodes = getTotalEpisodes(anime);
+
+		if (totalEpisodes <= 0) return null;
+
+		return EPISODE_BUCKETS.find((bucket) => {
+			return totalEpisodes >= bucket.min && totalEpisodes <= bucket.max;
+		})?.label;
+	};
+
+	const getScoreLabel = (anime: Anime) => {
+		if (anime.score <= 0) return null;
+
+		return String(Math.floor(anime.score));
+	};
+
+	const getYearLabel = (anime: Anime) => {
+		return anime.startSeason?.year ? String(anime.startSeason.year) : null;
+	};
+
+	const getGenreLabels = (anime: Anime) => {
+		return anime.genres.map((genre) => genre.name.trim()).filter(Boolean);
+	};
+
+	const groupAnimeTitlesByLabel = (
+		items: Anime[],
+		getLabels: (anime: Anime) => Array<string | null | undefined>
+	): BarChartDetailsByLabel => {
+		const groups: BarChartDetailsByLabel = {};
+
+		for (const anime of items) {
+			const labels = new Set(getLabels(anime).filter(Boolean) as string[]);
+
+			for (const label of labels) {
+				groups[label] ??= [];
+				groups[label].push(anime.title);
+			}
+		}
+
+		for (const titles of Object.values(groups)) {
+			titles.sort((a, b) => a.localeCompare(b));
+		}
+
+		return groups;
+	};
 
 	const cache = getAnimeCacheContext();
 	const listState = cache.list;
@@ -41,6 +124,38 @@
 	let error = $state<string | null>(null);
 
 	const stats = $derived(listState.data ? buildAnimeStats(listState.data.animes) : null);
+
+	const completedAnime = $derived(
+		listState.data?.animes.filter((anime) => anime.status === 'completed') ?? []
+	);
+
+	const statusDetails = $derived(
+		groupAnimeTitlesByLabel(listState.data?.animes ?? [], (anime) => [
+			STATUS_LABELS[anime.status]
+		])
+	);
+
+	const scoreDetails = $derived(
+		groupAnimeTitlesByLabel(completedAnime, (anime) => [getScoreLabel(anime)])
+	);
+
+	const genreDetails = $derived(
+		groupAnimeTitlesByLabel(completedAnime, getGenreLabels)
+	);
+
+	const mediaTypeDetails = $derived(
+		groupAnimeTitlesByLabel(completedAnime, (anime) => [
+			normalizeMediaType(anime.mediaType)
+		])
+	);
+
+	const episodeDetails = $derived(
+		groupAnimeTitlesByLabel(completedAnime, (anime) => [getEpisodeBucketLabel(anime)])
+	);
+
+	const yearDetails = $derived(
+		groupAnimeTitlesByLabel(completedAnime, (anime) => [getYearLabel(anime)])
+	);
 
 	const runtimeRows: StatsTableRow[] = $derived(
 		stats?.longestRuntime.map((item) => ({
@@ -174,12 +289,41 @@
 				</div>
 
 				<div class="grid gap-2 lg:grid-cols-2">
-					<BarChart title="status" items={stats.statusDistribution} />
-					<BarChart title="completed scores" items={stats.scoreDistribution} />
-					<BarChart title="completed genres" items={stats.genreDistribution} />
-					<BarChart title="completed media" items={stats.mediaTypeDistribution} />
-					<BarChart title="completed episodes" items={stats.episodeDistribution} />
-					<BarChart title="completed years" items={stats.topYears} />
+					<BarChart
+						title="status"
+						items={stats.statusDistribution}
+						detailsByLabel={statusDetails}
+					/>
+
+					<BarChart
+						title="completed scores"
+						items={stats.scoreDistribution}
+						detailsByLabel={scoreDetails}
+					/>
+
+					<BarChart
+						title="completed genres"
+						items={stats.genreDistribution}
+						detailsByLabel={genreDetails}
+					/>
+
+					<BarChart
+						title="completed media"
+						items={stats.mediaTypeDistribution}
+						detailsByLabel={mediaTypeDetails}
+					/>
+
+					<BarChart
+						title="completed episodes"
+						items={stats.episodeDistribution}
+						detailsByLabel={episodeDetails}
+					/>
+
+					<BarChart
+						title="completed years"
+						items={stats.topYears}
+						detailsByLabel={yearDetails}
+					/>
 				</div>
 
 				<div class="grid gap-2 lg:grid-cols-2">
