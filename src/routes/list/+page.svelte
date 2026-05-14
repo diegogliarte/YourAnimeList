@@ -131,7 +131,7 @@
 </script>
 
 <svelte:head>
-	<title>Your Anime List</title>
+	<title>YourAnimeList</title>
 	<meta name="description" content="Compact MyAnimeList viewer." />
 </svelte:head>
 

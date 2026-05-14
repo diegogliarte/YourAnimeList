@@ -55,7 +55,7 @@
 	<div class="flex flex-col gap-3">
 		<div class="flex flex-wrap items-center justify-between gap-2">
 			<div>
-				<h1 class="text-lg font-semibold text-white">Your Anime List</h1>
+				<h1 class="text-lg font-semibold text-white">YourAnimeList</h1>
 			</div>
 
 			<nav class="flex flex-wrap gap-2">

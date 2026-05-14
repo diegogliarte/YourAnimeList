@@ -1,4 +1,4 @@
-# Your Anime List
+# YourAnimeList
 
 A compact MyAnimeList viewer built with SvelteKit.
 
@@ -6,7 +6,7 @@ Live site: [anime.diegogliarte.com](https://anime.diegogliarte.com)
 
 ## About
 
-Your Anime List is a small web app for browsing a MyAnimeList profile with a cleaner, faster, table-focused interface.
+YourAnimeList is a small web app for browsing a MyAnimeList profile with a cleaner, faster, table-focused interface.
 
 It lets you search a MAL username, inspect their anime list, filter by list status, sort entries, and discover new anime through MyAnimeList rankings while hiding entries already present in the user's list.
 
