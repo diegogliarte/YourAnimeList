@@ -40,7 +40,8 @@
 		{ label: '14-26', min: 14, max: 26 },
 		{ label: '27-52', min: 27, max: 52 },
 		{ label: '53-99', min: 53, max: 99 },
-		{ label: '100+', min: 100, max: Number.POSITIVE_INFINITY }
+		{ label: '100-999', min: 100, max: 999 },
+		{ label: '1000+', min: 1000, max: Number.POSITIVE_INFINITY }
 	];
 
 	const SEASON_LABELS: Record<string, string> = {
