@@ -5,6 +5,7 @@
 
 	import AnimeHeader from '$lib/components/anime/AnimeHeader.svelte';
 	import BarChart, { type BarChartDetailsByLabel } from '$lib/components/stats/BarChart.svelte';
+	import SpotlightGrid from '$lib/components/stats/SpotlightGrid.svelte';
 	import StatCard from '$lib/components/stats/StatCard.svelte';
 	import StatsTable, { type StatsTableRow } from '$lib/components/stats/StatsTable.svelte';
 	import EmptyState from '$lib/components/ui/EmptyState.svelte';
@@ -40,6 +41,21 @@
 		{ label: '27-52', min: 27, max: 52 },
 		{ label: '53-99', min: 53, max: 99 },
 		{ label: '100+', min: 100, max: Number.POSITIVE_INFINITY }
+	];
+
+	const SEASON_LABELS: Record<string, string> = {
+		winter: 'winter',
+		spring: 'spring',
+		summer: 'summer',
+		fall: 'fall'
+	};
+
+	const MEAN_GAP_BUCKETS = [
+		{ label: 'you +2', min: 2, max: Number.POSITIVE_INFINITY },
+		{ label: 'you +1', min: 1, max: 2 },
+		{ label: 'close', min: -1, max: 1 },
+		{ label: 'MAL +1', min: -2, max: -1 },
+		{ label: 'MAL +2', min: Number.NEGATIVE_INFINITY, max: -2 }
 	];
 
 	const normalizeMediaType = (mediaType: string | null | undefined) => {
@@ -78,6 +94,37 @@
 
 	const getYearLabel = (anime: Anime) => {
 		return anime.startSeason?.year ? String(anime.startSeason.year) : null;
+	};
+
+	const getDecadeLabel = (anime: Anime) => {
+		const year = anime.startSeason?.year;
+
+		if (!year) return null;
+
+		return `${Math.floor(year / 10) * 10}s`;
+	};
+
+	const getSeasonLabel = (anime: Anime) => {
+		const season = anime.startSeason?.season?.toLowerCase();
+
+		if (!season) return null;
+
+		return SEASON_LABELS[season] ?? season.replaceAll('_', ' ');
+	};
+
+	const getMeanGapLabel = (anime: Anime) => {
+		const score = anime.score > 0 ? anime.score : null;
+		const mean = typeof anime.mean === 'number' && anime.mean > 0 ? anime.mean : null;
+
+		if (score === null || mean === null) return null;
+
+		const gap = score - mean;
+
+		return (
+			MEAN_GAP_BUCKETS.find((bucket) => {
+				return gap >= bucket.min && gap < bucket.max;
+			})?.label ?? 'close'
+		);
 	};
 
 	const getGenreLabels = (anime: Anime) => {
@@ -139,14 +186,10 @@
 		groupAnimeTitlesByLabel(completedAnime, (anime) => [getScoreLabel(anime)])
 	);
 
-	const genreDetails = $derived(
-		groupAnimeTitlesByLabel(completedAnime, getGenreLabels)
-	);
+	const genreDetails = $derived(groupAnimeTitlesByLabel(completedAnime, getGenreLabels));
 
 	const mediaTypeDetails = $derived(
-		groupAnimeTitlesByLabel(completedAnime, (anime) => [
-			normalizeMediaType(anime.mediaType)
-		])
+		groupAnimeTitlesByLabel(completedAnime, (anime) => [normalizeMediaType(anime.mediaType)])
 	);
 
 	const episodeDetails = $derived(
@@ -155,6 +198,18 @@
 
 	const yearDetails = $derived(
 		groupAnimeTitlesByLabel(completedAnime, (anime) => [getYearLabel(anime)])
+	);
+
+	const seasonDetails = $derived(
+		groupAnimeTitlesByLabel(completedAnime, (anime) => [getSeasonLabel(anime)])
+	);
+
+	const decadeDetails = $derived(
+		groupAnimeTitlesByLabel(completedAnime, (anime) => [getDecadeLabel(anime)])
+	);
+
+	const meanGapDetails = $derived(
+		groupAnimeTitlesByLabel(completedAnime, (anime) => [getMeanGapLabel(anime)])
 	);
 
 	const runtimeRows: StatsTableRow[] = $derived(
@@ -186,13 +241,7 @@
 	const toGenreRows = (items: GenreStat[]): StatsTableRow[] =>
 		items.map((item) => ({
 			key: item.genre,
-			values: [
-				item.genre,
-				item.count,
-				item.averageScoreLabel,
-				item.episodes,
-				item.runtimeLabel
-			]
+			values: [item.genre, item.count, item.averageScoreLabel, item.episodes, item.runtimeLabel]
 		}));
 
 	const genreRows: StatsTableRow[] = $derived(stats ? toGenreRows(stats.genreStats) : []);
@@ -245,8 +294,7 @@
 
 		if (!initialUsername) return;
 
-		const alreadyLoadedSameUser =
-			listState.data && listState.loadedUsername === initialUsername;
+		const alreadyLoadedSameUser = listState.data && listState.loadedUsername === initialUsername;
 
 		if (!alreadyLoadedSameUser) {
 			void loadStats(initialUsername);
@@ -320,6 +368,12 @@
 					/>
 
 					<BarChart
+						title="completed decades"
+						items={stats.decadeDistribution}
+						detailsByLabel={decadeDetails}
+					/>
+
+					<BarChart
 						title="completed years"
 						items={stats.topYears}
 						detailsByLabel={yearDetails}
@@ -360,6 +414,22 @@
 						headers={['genre', 'entries', 'avg', 'eps', 'runtime']}
 						rows={bestGenreRows}
 						emptyMessage="No genres with at least 3 rated completed entries."
+					/>
+				</div>
+
+				<div class="grid gap-2 lg:grid-cols-2">
+					<SpotlightGrid
+						title="hidden gems"
+						description="Completed anime you rated much higher than the MAL mean."
+						items={stats.hiddenGems}
+						emptyMessage="No clear hidden gems found yet."
+					/>
+
+					<SpotlightGrid
+						title="overrated by MAL"
+						description="Completed anime where the MAL mean is much higher than your score."
+						items={stats.overratedByMal}
+						emptyMessage="No clearly overrated picks found yet."
 					/>
 				</div>
 			</div>
