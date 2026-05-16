@@ -1,5 +1,3 @@
-import { EXCLUDE_STATUS_OPTIONS } from '$lib/constants/anime';
-
 import type { Anime, ApiAnimeStatus } from '$lib/types/anime';
 
 export type StatCardValue = {
@@ -14,80 +12,149 @@ export type ChartDatum = {
 	detail?: string;
 };
 
-export type RuntimeAnimeStat = {
-	id: Anime['id'];
-	title: string;
-	episodes: number;
-	watchedEpisodes: number;
-	numberOfTimesRewatched: number;
-	totalWatches: number;
-	episodeDurationSeconds: number;
-	totalRuntimeSeconds: number;
-	watchedRuntimeSeconds: number;
-	totalRuntimeLabel: string;
-	watchedRuntimeLabel: string;
+export type StatsTableRow = {
+	key: string | number;
+	values: Array<string | number>;
 };
 
-export type RewatchAnimeStat = {
-	id: Anime['id'];
-	title: string;
-	score: string;
-	numberOfTimesRewatched: number;
-	totalWatches: number;
-	totalEpisodes: number;
-	baseWatchedEpisodes: number;
-	effectiveWatchedEpisodes: number;
-	averageEpisodeDurationSeconds: number | null;
-	effectiveWatchedRuntimeSeconds: number | null;
-	effectiveWatchedRuntimeLabel: string;
-};
+export type DetailsByLabel = Record<string, string[]>;
 
-export type GenreStat = {
-	genre: string;
-	count: number;
-	ratedCount: number;
-	episodes: number;
-	runtimeSeconds: number;
-	averageScore: number | null;
-	averageScoreLabel: string;
-	runtimeLabel: string;
-};
-
-export type AnimeSpotlightStat = {
+export type AnimeStatItem = {
 	id: Anime['id'];
 	title: string;
 	image: Anime['image'];
 	href: string;
-	score: number;
+
+	status: ApiAnimeStatus;
+	statusLabel: string;
+	completed: boolean;
+
+	score: number | null;
 	scoreLabel: string;
-	mean: number;
+	scoreBucket: string | null;
+
+	mean: number | null;
 	meanLabel: string;
-	gap: number;
+	gap: number | null;
 	gapLabel: string;
+	meanGapBucket: string | null;
+
 	popularity: number | null;
 	popularityLabel: string | null;
+
+	mediaType: string;
+
+	year: number | null;
+	yearLabel: string | null;
+	decadeLabel: string | null;
+	seasonLabel: string | null;
+
+	episodes: number;
+	episodeBucket: string | null;
+
+	baseWatchedEpisodes: number;
+	effectiveWatchedEpisodes: number;
+
+	rewatchCount: number;
+	totalWatches: number;
+
+	episodeDurationSeconds: number | null;
+	totalRuntimeSeconds: number | null;
+	watchedRuntimeSeconds: number | null;
+	totalRuntimeLabel: string;
+	watchedRuntimeLabel: string;
+
+	genres: string[];
+	tags: string[];
+
+	labels: {
+		status: string;
+		score: string | null;
+		genre: string[];
+		mediaType: string;
+		episodeBucket: string | null;
+		year: string | null;
+		season: string | null;
+		decade: string | null;
+		meanGap: string | null;
+		tag: string[];
+	};
+};
+
+export type AnimeSpotlightStat = AnimeStatItem & {
+	score: number;
+	mean: number;
+	gap: number;
+	meanGapBucket: string;
 };
 
 export type AnimeStats = {
+	items: AnimeStatItem[];
+	completedItems: AnimeStatItem[];
+
 	cards: StatCardValue[];
-	statusDistribution: ChartDatum[];
-	scoreDistribution: ChartDatum[];
-	mediaTypeDistribution: ChartDatum[];
-	episodeDistribution: ChartDatum[];
-	genreDistribution: ChartDatum[];
-	seasonDistribution: ChartDatum[];
-	decadeDistribution: ChartDatum[];
-	meanGapDistribution: ChartDatum[];
-	topYears: ChartDatum[];
-	topTags: ChartDatum[];
-	genreStats: GenreStat[];
-	bestGenres: GenreStat[];
-	longestRuntime: RuntimeAnimeStat[];
-	topRewatches: RewatchAnimeStat[];
-	hiddenGems: AnimeSpotlightStat[];
-	overratedByMal: AnimeSpotlightStat[];
-	mostObscure: AnimeSpotlightStat[];
+
+	charts: {
+		status: ChartDatum[];
+		scores: ChartDatum[];
+		genres: ChartDatum[];
+		mediaTypes: ChartDatum[];
+		episodes: ChartDatum[];
+		decades: ChartDatum[];
+		years: ChartDatum[];
+		seasons: ChartDatum[];
+		meanGap: ChartDatum[];
+		tags: ChartDatum[];
+	};
+
+	details: {
+		status: DetailsByLabel;
+		scores: DetailsByLabel;
+		genres: DetailsByLabel;
+		mediaTypes: DetailsByLabel;
+		episodes: DetailsByLabel;
+		decades: DetailsByLabel;
+		years: DetailsByLabel;
+		seasons: DetailsByLabel;
+		meanGap: DetailsByLabel;
+	};
+
+	tables: {
+		longestRuntime: StatsTableRow[];
+		topRewatches: StatsTableRow[];
+		tags: StatsTableRow[];
+		genres: StatsTableRow[];
+		bestGenres: StatsTableRow[];
+	};
+
+	spotlights: {
+		hiddenGems: AnimeSpotlightStat[];
+		overratedByMal: AnimeSpotlightStat[];
+		mostObscure: AnimeSpotlightStat[];
+	};
 };
+
+type LabelGetter<T> = (
+	item: T
+) => string | null | undefined | Array<string | null | undefined>;
+
+type GenreSummary = {
+	genre: string;
+	count: number;
+	ratedCount: number;
+	scoreTotal: number;
+	episodes: number;
+	runtimeSeconds: number;
+	averageScore: number | null;
+};
+
+const STATUS_ORDER: ApiAnimeStatus[] = [
+	'completed',
+	'watching',
+	'on_hold',
+	'dropped',
+	'plan_to_watch'
+];
 
 const STATUS_LABELS: Record<ApiAnimeStatus, string> = {
 	completed: 'completed',
@@ -108,14 +175,14 @@ const EPISODE_BUCKETS = [
 	{ label: '1000+', min: 1000, max: Number.POSITIVE_INFINITY }
 ];
 
+const SEASON_ORDER = ['winter', 'spring', 'summer', 'fall'];
+
 const SEASON_LABELS: Record<string, string> = {
 	winter: 'winter',
 	spring: 'spring',
 	summer: 'summer',
 	fall: 'fall'
 };
-
-const SEASON_ORDER = ['winter', 'spring', 'summer', 'fall'];
 
 const MEAN_GAP_BUCKETS = [
 	{ label: 'you +2', min: 2, max: Number.POSITIVE_INFINITY },
@@ -125,33 +192,29 @@ const MEAN_GAP_BUCKETS = [
 	{ label: 'MAL +2', min: Number.NEGATIVE_INFINITY, max: -2 }
 ];
 
-const normalizeMediaType = (mediaType: string | null | undefined) => {
-	if (!mediaType) return 'unknown';
+const COMPARABLE_MEDIA_TYPES = new Set(['tv', 'movie', 'ova']);
 
-	return mediaType.replaceAll('_', ' ').toLowerCase();
-};
+const STATUS_CHART_ORDER = STATUS_ORDER.map((status) => STATUS_LABELS[status]);
+const SCORE_CHART_ORDER = Array.from({ length: 10 }, (_, index) => String(10 - index));
+const EPISODE_CHART_ORDER = EPISODE_BUCKETS.map((bucket) => bucket.label);
+const SEASON_CHART_ORDER = SEASON_ORDER.map((season) => SEASON_LABELS[season]);
+const MEAN_GAP_CHART_ORDER = MEAN_GAP_BUCKETS.map((bucket) => bucket.label);
 
-const formatNumber = (value: number) => {
-	return new Intl.NumberFormat('en-US').format(value);
-};
+const formatNumber = (value: number) => new Intl.NumberFormat('en-US').format(value);
 
-const formatDecimal = (value: number, digits = 1) => {
-	return value.toFixed(digits);
+const formatDecimal = (value: number, digits = 1) => value.toFixed(digits);
+
+const formatSignedDecimal = (value: number, digits = 2) => {
+	if (value > 0) return `+${formatDecimal(value, digits)}`;
+	if (value < 0) return `-${formatDecimal(Math.abs(value), digits)}`;
+
+	return '0';
 };
 
 const toPercentage = (value: number, total: number) => {
-	if (total === 0) return '0.0%';
+	if (total <= 0) return '0.0%';
 
 	return `${formatDecimal((value / total) * 100, 1)}%`;
-};
-
-const formatSignedDecimal = (value: number, digits = 2) => {
-	const formatted = formatDecimal(Math.abs(value), digits);
-
-	if (value > 0) return `+${formatted}`;
-	if (value < 0) return `-${formatted}`;
-
-	return '0';
 };
 
 const formatDuration = (seconds: number | null | undefined) => {
@@ -161,60 +224,135 @@ const formatDuration = (seconds: number | null | undefined) => {
 	const hours = seconds / 3600;
 	const days = hours / 24;
 
-	if (days >= 1) {
-		return `${formatDecimal(days, 1)}d`;
-	}
-
-	if (hours >= 1) {
-		return `${formatDecimal(hours, 1)}h`;
-	}
+	if (days >= 1) return `${formatDecimal(days, 1)}d`;
+	if (hours >= 1) return `${formatDecimal(hours, 1)}h`;
 
 	return `${Math.round(minutes)}m`;
 };
 
-const increment = <T extends string | number>(map: Map<T, number>, key: T, amount = 1) => {
-	map.set(key, (map.get(key) ?? 0) + amount);
+const normalizeMediaType = (mediaType: string | null | undefined) => {
+	return mediaType?.replaceAll('_', ' ').toLowerCase() || 'unknown';
 };
 
-const toSortedChartData = <T extends string | number>(
-	map: Map<T, number>,
+const average = (total: number, count: number) => {
+	return count > 0 ? total / count : 0;
+};
+
+const standardDeviation = (values: number[]) => {
+	if (values.length === 0) return 0;
+
+	const mean = average(
+		values.reduce((sum, value) => sum + value, 0),
+		values.length
+	);
+
+	const variance = average(
+		values.reduce((sum, value) => sum + (value - mean) ** 2, 0),
+		values.length
+	);
+
+	return Math.sqrt(variance);
+};
+
+const byTitle = <T extends { title: string }>(a: T, b: T) => {
+	return a.title.localeCompare(b.title);
+};
+
+const takeSorted = <T>(items: T[], compare: (a: T, b: T) => number, limit: number) => {
+	return [...items].sort(compare).slice(0, limit);
+};
+
+const toLabels = <T>(item: T, getLabels: LabelGetter<T>) => {
+	const rawLabels = getLabels(item);
+	const labels = Array.isArray(rawLabels) ? rawLabels : [rawLabels];
+
+	return [...new Set(labels.filter(Boolean) as string[])];
+};
+
+const countByLabel = <T>(
+	items: T[],
+	getLabels: LabelGetter<T>,
+	order: string[] = []
+): Map<string, number> => {
+	const map = new Map(order.map((label) => [label, 0]));
+
+	for (const item of items) {
+		for (const label of toLabels(item, getLabels)) {
+			map.set(label, (map.get(label) ?? 0) + 1);
+		}
+	}
+
+	return map;
+};
+
+const detailsByLabel = <T extends { title: string }>(
+	items: T[],
+	getLabels: LabelGetter<T>
+): DetailsByLabel => {
+	const details: DetailsByLabel = {};
+
+	for (const item of items) {
+		for (const label of toLabels(item, getLabels)) {
+			details[label] ??= [];
+			details[label].push(item.title);
+		}
+	}
+
+	for (const titles of Object.values(details)) {
+		titles.sort((a, b) => a.localeCompare(b));
+	}
+
+	return details;
+};
+
+const chartFromCounts = (
+	counts: Map<string, number>,
 	options: {
 		total?: number;
 		limit?: number;
-		label?: (value: T) => string;
+		order?: string[];
 		sort?: 'label' | 'value-desc' | 'value-asc';
 	} = {}
 ): ChartDatum[] => {
-	const { total, limit, label = String, sort = 'value-desc' } = options;
+	const { total, limit, order, sort = 'value-desc' } = options;
 
-	const items = [...map.entries()].map(([key, value]) => ({
-		label: label(key),
+	const entries = order
+		? order.map((label) => [label, counts.get(label) ?? 0] as const)
+		: [...counts.entries()];
+
+	if (!order) {
+		entries.sort(([aLabel, aValue], [bLabel, bValue]) => {
+			if (sort === 'label') return aLabel.localeCompare(bLabel);
+			if (sort === 'value-asc') return aValue - bValue || aLabel.localeCompare(bLabel);
+
+			return bValue - aValue || aLabel.localeCompare(bLabel);
+		});
+	}
+
+	return entries.slice(0, limit).map(([label, value]) => ({
+		label,
 		value,
 		detail: typeof total === 'number' ? toPercentage(value, total) : undefined
 	}));
+};
 
-	items.sort((a, b) => {
-		if (sort === 'label') return a.label.localeCompare(b.label);
-		if (sort === 'value-asc') return a.value - b.value;
-
-		return b.value - a.value || a.label.localeCompare(b.label);
-	});
-
-	return typeof limit === 'number' ? items.slice(0, limit) : items;
+const chartByLabel = <T>(
+	items: T[],
+	getLabels: LabelGetter<T>,
+	options: {
+		total?: number;
+		limit?: number;
+		order?: string[];
+		sort?: 'label' | 'value-desc' | 'value-asc';
+	} = {}
+): ChartDatum[] => {
+	return chartFromCounts(countByLabel(items, getLabels, options.order), options);
 };
 
 const getRewatchCount = (anime: Anime) => {
 	const rewatches = anime.numberOfTimesRewatched ?? 0;
 
-	if (!Number.isFinite(rewatches) || rewatches <= 0) {
-		return 0;
-	}
-
-	return Math.trunc(rewatches);
-};
-
-const getWatchMultiplier = (anime: Anime) => {
-	return 1 + getRewatchCount(anime);
+	return Number.isFinite(rewatches) && rewatches > 0 ? Math.trunc(rewatches) : 0;
 };
 
 const getTotalEpisodes = (anime: Anime) => {
@@ -229,81 +367,22 @@ const getTotalEpisodes = (anime: Anime) => {
 	return 0;
 };
 
-const getRawWatchedEpisodes = (anime: Anime) => {
+const getWatchedEpisodes = (anime: Anime, totalEpisodes: number) => {
+	let watchedEpisodes = 0;
+
 	if (typeof anime.episodesWatched === 'number' && anime.episodesWatched > 0) {
-		return anime.episodesWatched;
+		watchedEpisodes = anime.episodesWatched;
+	} else if (anime.status === 'completed') {
+		watchedEpisodes = totalEpisodes;
 	}
 
-	if (anime.status === 'completed') {
-		return getTotalEpisodes(anime);
-	}
-
-	return 0;
+	return totalEpisodes > 0 ? Math.min(watchedEpisodes, totalEpisodes) : watchedEpisodes;
 };
 
-const getWatchedEpisodes = (anime: Anime) => {
-	const watchedEpisodes = getRawWatchedEpisodes(anime);
-	const totalEpisodes = getTotalEpisodes(anime);
+const getEpisodeBucket = (episodes: number) => {
+	if (episodes <= 0) return null;
 
-	if (totalEpisodes <= 0) return watchedEpisodes;
-
-	return Math.min(watchedEpisodes, totalEpisodes);
-};
-
-const getEffectiveWatchedEpisodes = (anime: Anime) => {
-	return getWatchedEpisodes(anime) * getWatchMultiplier(anime);
-};
-
-const getAverageEpisodeDurationSeconds = (anime: Anime) => {
-	const value = anime.averageEpisodeDuration;
-
-	if (typeof value !== 'number' || value <= 0) {
-		return null;
-	}
-
-	return value;
-};
-
-const getEffectiveWatchedRuntimeSeconds = (anime: Anime) => {
-	const watchedEpisodes = getEffectiveWatchedEpisodes(anime);
-	const episodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
-
-	if (!watchedEpisodes || !episodeDurationSeconds) {
-		return null;
-	}
-
-	return watchedEpisodes * episodeDurationSeconds;
-};
-
-const getUniqueTotalRuntimeSeconds = (anime: Anime) => {
-	const totalEpisodes = getTotalEpisodes(anime);
-	const episodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
-
-	if (!totalEpisodes || !episodeDurationSeconds) {
-		return null;
-	}
-
-	return totalEpisodes * episodeDurationSeconds;
-};
-
-const getUserScore = (anime: Anime) => {
-	return anime.score > 0 ? anime.score : null;
-};
-
-const getIntegerScore = (anime: Anime) => {
-	const score = getUserScore(anime);
-
-	if (!score) return null;
-
-	return Math.floor(score);
-};
-
-const getPopularity = (anime: Anime) => {
-	return anime.popularity ?? null;
-};
-
-const getYear = (anime: Anime) => {
-	return anime.startSeason?.year ?? null;
+	return EPISODE_BUCKETS.find((bucket) => episodes >= bucket.min && episodes <= bucket.max)?.label ?? null;
 };
 
 const getSeasonLabel = (anime: Anime) => {
@@ -314,8 +393,10 @@ const getSeasonLabel = (anime: Anime) => {
 	return SEASON_LABELS[season] ?? season.replaceAll('_', ' ');
 };
 
-const getDecadeLabel = (year: number) => {
-	return `${Math.floor(year / 10) * 10}s`;
+const getMeanGapBucket = (gap: number | null) => {
+	if (gap === null) return null;
+
+	return MEAN_GAP_BUCKETS.find((bucket) => gap >= bucket.min && gap < bucket.max)?.label ?? 'close';
 };
 
 const getGenres = (anime: Anime) => {
@@ -326,445 +407,238 @@ const getTags = (anime: Anime) => {
 	return anime.tags.map((tag) => tag.trim().toLowerCase()).filter(Boolean);
 };
 
-const getMeanGapBucketLabel = (gap: number) => {
-	return (
-		MEAN_GAP_BUCKETS.find((bucket) => {
-			return gap >= bucket.min && gap < bucket.max;
-		})?.label ?? 'close'
-	);
-};
+const toStatItem = (anime: Anime): AnimeStatItem => {
+	const score = anime.score > 0 ? anime.score : null;
+	const mean = typeof anime.mean === 'number' && anime.mean > 0 ? anime.mean : null;
+	const gap = score !== null && mean !== null ? score - mean : null;
 
-const getStandardDeviation = (values: number[]) => {
-	if (values.length === 0) return 0;
+	const popularity = anime.popularity ?? null;
+	const mediaType = normalizeMediaType(anime.mediaType);
 
-	const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+	const year = anime.startSeason?.year ?? null;
+	const yearLabel = year ? String(year) : null;
+	const decadeLabel = year ? `${Math.floor(year / 10) * 10}s` : null;
+	const seasonLabel = getSeasonLabel(anime);
 
-	const variance =
-		values.reduce((sum, value) => {
-			return sum + (value - mean) ** 2;
-		}, 0) / values.length;
-
-	return Math.sqrt(variance);
-};
-
-const buildRuntimeRow = (anime: Anime): RuntimeAnimeStat | null => {
 	const episodes = getTotalEpisodes(anime);
-	const episodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
+	const episodeBucket = getEpisodeBucket(episodes);
 
-	if (!episodes || !episodeDurationSeconds) {
-		return null;
-	}
+	const rewatchCount = getRewatchCount(anime);
+	const totalWatches = 1 + rewatchCount;
 
-	const watchedEpisodes = getEffectiveWatchedEpisodes(anime);
-	const totalRuntimeSeconds = episodes * episodeDurationSeconds;
-	const watchedRuntimeSeconds = watchedEpisodes * episodeDurationSeconds;
-	const numberOfTimesRewatched = getRewatchCount(anime);
+	const baseWatchedEpisodes = getWatchedEpisodes(anime, episodes);
+	const effectiveWatchedEpisodes = baseWatchedEpisodes * totalWatches;
 
-	return {
-		id: anime.id,
-		title: anime.title,
-		episodes,
-		watchedEpisodes,
-		numberOfTimesRewatched,
-		totalWatches: getWatchMultiplier(anime),
-		episodeDurationSeconds,
-		totalRuntimeSeconds,
-		watchedRuntimeSeconds,
-		totalRuntimeLabel: formatDuration(totalRuntimeSeconds),
-		watchedRuntimeLabel: formatDuration(watchedRuntimeSeconds)
-	};
-};
+	const episodeDurationSeconds =
+		typeof anime.averageEpisodeDuration === 'number' && anime.averageEpisodeDuration > 0
+			? anime.averageEpisodeDuration
+			: null;
 
-const buildRewatchRow = (anime: Anime): RewatchAnimeStat | null => {
-	const numberOfTimesRewatched = getRewatchCount(anime);
+	const totalRuntimeSeconds =
+		episodes > 0 && episodeDurationSeconds ? episodes * episodeDurationSeconds : null;
 
-	if (numberOfTimesRewatched <= 0) {
-		return null;
-	}
+	const watchedRuntimeSeconds =
+		effectiveWatchedEpisodes > 0 && episodeDurationSeconds
+			? effectiveWatchedEpisodes * episodeDurationSeconds
+			: null;
 
-	const totalEpisodes = getTotalEpisodes(anime);
-	const baseWatchedEpisodes = getWatchedEpisodes(anime);
-	const effectiveWatchedEpisodes = getEffectiveWatchedEpisodes(anime);
-	const averageEpisodeDurationSeconds = getAverageEpisodeDurationSeconds(anime);
-	const effectiveWatchedRuntimeSeconds = getEffectiveWatchedRuntimeSeconds(anime);
+	const statusLabel = STATUS_LABELS[anime.status];
+	const scoreBucket = score === null ? null : String(Math.floor(score));
+	const meanGapBucket = getMeanGapBucket(gap);
 
-	return {
-		id: anime.id,
-		title: anime.title,
-		score: anime.displayScore || String(anime.score || '—'),
-		numberOfTimesRewatched,
-		totalWatches: getWatchMultiplier(anime),
-		totalEpisodes,
-		baseWatchedEpisodes,
-		effectiveWatchedEpisodes,
-		averageEpisodeDurationSeconds,
-		effectiveWatchedRuntimeSeconds,
-		effectiveWatchedRuntimeLabel: formatDuration(effectiveWatchedRuntimeSeconds)
-	};
-};
-
-const buildSpotlightRow = (
-	anime: Anime,
-	score: number,
-	mean: number,
-	gap: number
-): AnimeSpotlightStat => {
-	const popularity = getPopularity(anime);
+	const genres = getGenres(anime);
+	const tags = getTags(anime);
 
 	return {
 		id: anime.id,
 		title: anime.title,
 		image: anime.image,
 		href: `https://myanimelist.net/anime/${anime.id}`,
+
+		status: anime.status,
+		statusLabel,
+		completed: anime.status === 'completed',
+
 		score,
-		scoreLabel: anime.displayScore || formatDecimal(score, 1),
+		scoreLabel: score === null ? '—' : anime.displayScore || formatDecimal(score, 1),
+		scoreBucket,
+
 		mean,
-		meanLabel: formatDecimal(mean, 2),
+		meanLabel: mean === null ? '—' : formatDecimal(mean, 2),
 		gap,
-		gapLabel: formatSignedDecimal(gap, 2),
+		gapLabel: gap === null ? '—' : formatSignedDecimal(gap, 2),
+		meanGapBucket,
+
 		popularity,
-		popularityLabel: popularity === null ? null : `#${formatNumber(popularity)} popularity`
+		popularityLabel: popularity === null ? null : `#${formatNumber(popularity)} popularity`,
+
+		mediaType,
+
+		year,
+		yearLabel,
+		decadeLabel,
+		seasonLabel,
+
+		episodes,
+		episodeBucket,
+
+		baseWatchedEpisodes,
+		effectiveWatchedEpisodes,
+
+		rewatchCount,
+		totalWatches,
+
+		episodeDurationSeconds,
+		totalRuntimeSeconds,
+		watchedRuntimeSeconds,
+		totalRuntimeLabel: formatDuration(totalRuntimeSeconds),
+		watchedRuntimeLabel: formatDuration(watchedRuntimeSeconds),
+
+		genres,
+		tags,
+
+		labels: {
+			status: statusLabel,
+			score: scoreBucket,
+			genre: genres,
+			mediaType,
+			episodeBucket,
+			year: yearLabel,
+			season: seasonLabel,
+			decade: decadeLabel,
+			meanGap: meanGapBucket,
+			tag: tags
+		}
 	};
 };
 
-type GenreAccumulator = {
-	genre: string;
-	count: number;
-	ratedCount: number;
-	scoreTotal: number;
-	episodes: number;
-	runtimeSeconds: number;
+const isComparableSpotlightItem = (item: AnimeStatItem): item is AnimeSpotlightStat => {
+	return (
+		item.completed &&
+		item.score !== null &&
+		item.mean !== null &&
+		item.gap !== null &&
+		item.meanGapBucket !== null &&
+		COMPARABLE_MEDIA_TYPES.has(item.mediaType)
+	);
 };
 
-const getOrCreateGenreAccumulator = (map: Map<string, GenreAccumulator>, genre: string) => {
-	const existing = map.get(genre);
+const buildGenreSummaries = (items: AnimeStatItem[]): GenreSummary[] => {
+	const map = new Map<string, Omit<GenreSummary, 'averageScore'>>();
 
-	if (existing) return existing;
-
-	const created: GenreAccumulator = {
-		genre,
-		count: 0,
-		ratedCount: 0,
-		scoreTotal: 0,
-		episodes: 0,
-		runtimeSeconds: 0
-	};
-
-	map.set(genre, created);
-
-	return created;
-};
-
-const buildGenreStats = (map: Map<string, GenreAccumulator>): GenreStat[] => {
-	return [...map.values()]
-		.map((item) => {
-			const averageScore = item.ratedCount > 0 ? item.scoreTotal / item.ratedCount : null;
-
-			return {
-				genre: item.genre,
-				count: item.count,
-				ratedCount: item.ratedCount,
-				episodes: item.episodes,
-				runtimeSeconds: item.runtimeSeconds,
-				averageScore,
-				averageScoreLabel: averageScore === null ? '—' : formatDecimal(averageScore, 2),
-				runtimeLabel: formatDuration(item.runtimeSeconds)
+	for (const item of items) {
+		for (const genre of item.genres) {
+			const current = map.get(genre) ?? {
+				genre,
+				count: 0,
+				ratedCount: 0,
+				scoreTotal: 0,
+				episodes: 0,
+				runtimeSeconds: 0
 			};
-		})
+
+			current.count += 1;
+			current.episodes += item.effectiveWatchedEpisodes;
+
+			if (item.score !== null) {
+				current.ratedCount += 1;
+				current.scoreTotal += item.score;
+			}
+
+			if (item.watchedRuntimeSeconds !== null) {
+				current.runtimeSeconds += item.watchedRuntimeSeconds;
+			}
+
+			map.set(genre, current);
+		}
+	}
+
+	return [...map.values()]
+		.map((genre) => ({
+			...genre,
+			averageScore: genre.ratedCount > 0 ? genre.scoreTotal / genre.ratedCount : null
+		}))
 		.sort((a, b) => b.count - a.count || a.genre.localeCompare(b.genre));
 };
 
+const toGenreRow = (genre: GenreSummary): StatsTableRow => ({
+	key: genre.genre,
+	values: [
+		genre.genre,
+		genre.count,
+		genre.averageScore === null ? '—' : formatDecimal(genre.averageScore, 2),
+		genre.episodes,
+		formatDuration(genre.runtimeSeconds)
+	]
+});
+
 export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
-	const totalEntries = animes.length;
-	const completedAnimes = animes.filter((anime) => anime.status === 'completed');
-	const completedTotal = completedAnimes.length;
+	const items = animes.map(toStatItem);
+	const completedItems = items.filter((item) => item.completed);
+	const comparableItems = items.filter(isComparableSpotlightItem);
 
-	const statusMap = new Map<ApiAnimeStatus, number>();
-	const scoreMap = new Map<number, number>();
-	const mediaTypeMap = new Map<string, number>();
-	const episodeBucketMap = new Map<string, number>();
-	const yearMap = new Map<number, number>();
-	const decadeMap = new Map<string, number>();
-	const seasonMap = new Map<string, number>();
-	const meanGapMap = new Map<string, number>();
-	const tagMap = new Map<string, number>();
-	const genreMap = new Map<string, number>();
-	const genreAccumulatorMap = new Map<string, GenreAccumulator>();
+	const totalEntries = items.length;
+	const completedTotal = completedItems.length;
 
-	let droppedCount = 0;
-	let plannedCount = 0;
+	const completedScores = completedItems
+		.map((item) => item.score)
+		.filter((score): score is number => score !== null);
 
-	let watchedEpisodeTotal = 0;
-	let watchedRuntimeSeconds = 0;
-	let watchedRuntimeEntries = 0;
+	const completedRatedCount = completedScores.length;
+	const completedScoreTotal = completedScores.reduce((sum, score) => sum + score, 0);
 
-	let uniqueCompletedEpisodeTotal = 0;
-	let effectiveCompletedEpisodeTotal = 0;
-	let uniqueCompletedRuntimeSeconds = 0;
-	let effectiveCompletedRuntimeSeconds = 0;
-	let completedRuntimeEntries = 0;
-
-	let completedScoreTotal = 0;
-	let completedRatedCount = 0;
-	let completedMeanGapTotal = 0;
-	let completedMeanGapCount = 0;
-
-	let rewatchedEntryCount = 0;
-	let totalRewatchCount = 0;
-
-	const completedScores: number[] = [];
-	const completedRuntimeRows: RuntimeAnimeStat[] = [];
-	const rewatchRows: RewatchAnimeStat[] = [];
-	const hiddenGemRows: AnimeSpotlightStat[] = [];
-	const overratedRows: AnimeSpotlightStat[] = [];
-	const mostObscureRows: AnimeSpotlightStat[] = [];
-
-	for (const option of EXCLUDE_STATUS_OPTIONS) {
-		statusMap.set(option.value, 0);
-	}
-
-	for (const bucket of EPISODE_BUCKETS) {
-		episodeBucketMap.set(bucket.label, 0);
-	}
-
-	for (const season of SEASON_ORDER) {
-		seasonMap.set(SEASON_LABELS[season], 0);
-	}
-
-	for (const bucket of MEAN_GAP_BUCKETS) {
-		meanGapMap.set(bucket.label, 0);
-	}
-
-	for (const anime of animes) {
-		increment(statusMap, anime.status);
-
-		if (anime.status === 'dropped') droppedCount += 1;
-		if (anime.status === 'plan_to_watch') plannedCount += 1;
-
-		const rewatchCount = getRewatchCount(anime);
-
-		if (rewatchCount > 0) {
-			rewatchedEntryCount += 1;
-			totalRewatchCount += rewatchCount;
-
-			const rewatchRow = buildRewatchRow(anime);
-
-			if (rewatchRow) {
-				rewatchRows.push(rewatchRow);
-			}
-		}
-
-		const effectiveWatchedEpisodes = getEffectiveWatchedEpisodes(anime);
-		const effectiveWatchedRuntime = getEffectiveWatchedRuntimeSeconds(anime);
-
-		watchedEpisodeTotal += effectiveWatchedEpisodes;
-
-		if (effectiveWatchedEpisodes > 0 && effectiveWatchedRuntime !== null) {
-			watchedRuntimeSeconds += effectiveWatchedRuntime;
-			watchedRuntimeEntries += 1;
-		}
-	}
-
-	for (const anime of completedAnimes) {
-		increment(mediaTypeMap, normalizeMediaType(anime.mediaType));
-
-		const score = getUserScore(anime);
-		const mean = typeof anime.mean === 'number' && anime.mean > 0 ? anime.mean : null;
-		const integerScore = getIntegerScore(anime);
-
-		if (score !== null) {
-			completedRatedCount += 1;
-			completedScoreTotal += score;
-			completedScores.push(score);
-		}
-
-		const isTVOrMovieOrOva = ['tv', 'movie', 'ova'].includes(normalizeMediaType(anime.mediaType));
-
-		if (score !== null && mean !== null && isTVOrMovieOrOva) {
-			const gap = score - mean;
-
-			completedMeanGapTotal += gap;
-			completedMeanGapCount += 1;
-
-			increment(meanGapMap, getMeanGapBucketLabel(gap));
-
-			const spotlightRow = buildSpotlightRow(anime, score, mean, gap);
-			const popularity = getPopularity(anime);
-
-			if (score >= 8 && mean <= 7.5 && gap >= 1) {
-				hiddenGemRows.push(spotlightRow);
-			}
-
-			if (score <= 6 && mean >= 8 && gap <= -1) {
-				overratedRows.push(spotlightRow);
-			}
-
-			if (score >= 8 && popularity !== null && popularity >= 1000) {
-				mostObscureRows.push(spotlightRow);
-			}
-		}
-
-		if (integerScore !== null) {
-			increment(scoreMap, integerScore);
-		}
-
-		const year = getYear(anime);
-
-		if (year) {
-			increment(yearMap, year);
-			increment(decadeMap, getDecadeLabel(year));
-		}
-
-		const season = getSeasonLabel(anime);
-
-		if (season) {
-			increment(seasonMap, season);
-		}
-
-		const totalEpisodes = getTotalEpisodes(anime);
-		const effectiveWatchedEpisodes = getEffectiveWatchedEpisodes(anime);
-
-		uniqueCompletedEpisodeTotal += totalEpisodes;
-		effectiveCompletedEpisodeTotal += effectiveWatchedEpisodes;
-
-		if (totalEpisodes > 0) {
-			const bucket = EPISODE_BUCKETS.find((item) => {
-				return totalEpisodes >= item.min && totalEpisodes <= item.max;
-			});
-
-			if (bucket) {
-				increment(episodeBucketMap, bucket.label);
-			}
-		}
-
-		for (const tag of getTags(anime)) {
-			increment(tagMap, tag);
-		}
-
-		const runtimeRow = buildRuntimeRow(anime);
-		const uniqueRuntime = getUniqueTotalRuntimeSeconds(anime);
-		const effectiveRuntime = getEffectiveWatchedRuntimeSeconds(anime);
-
-		if (runtimeRow && uniqueRuntime !== null && effectiveRuntime !== null) {
-			uniqueCompletedRuntimeSeconds += uniqueRuntime;
-			effectiveCompletedRuntimeSeconds += effectiveRuntime;
-			completedRuntimeEntries += 1;
-			completedRuntimeRows.push(runtimeRow);
-		}
-
-		const genres = getGenres(anime);
-
-		for (const genre of genres) {
-			increment(genreMap, genre);
-
-			const genreAccumulator = getOrCreateGenreAccumulator(genreAccumulatorMap, genre);
-
-			genreAccumulator.count += 1;
-			genreAccumulator.episodes += effectiveWatchedEpisodes;
-
-			if (score !== null) {
-				genreAccumulator.ratedCount += 1;
-				genreAccumulator.scoreTotal += score;
-			}
-
-			if (effectiveRuntime !== null) {
-				genreAccumulator.runtimeSeconds += effectiveRuntime;
-			}
-		}
-	}
-
-	const averageCompletedScore =
-		completedRatedCount > 0 ? completedScoreTotal / completedRatedCount : 0;
-
-	const scoreStandardDeviation = getStandardDeviation(completedScores);
-
-	const averageCompletedEpisodes =
-		completedTotal > 0 ? effectiveCompletedEpisodeTotal / completedTotal : 0;
-
-	const averageCompletedRuntimeSeconds =
-		completedRuntimeEntries > 0 ? effectiveCompletedRuntimeSeconds / completedRuntimeEntries : 0;
-
-	const averageMeanGap =
-		completedMeanGapCount > 0 ? completedMeanGapTotal / completedMeanGapCount : 0;
-
-	const rewatchRuntimeSeconds = Math.max(
-		0,
-		effectiveCompletedRuntimeSeconds - uniqueCompletedRuntimeSeconds
+	const watchedEpisodeTotal = items.reduce(
+		(sum, item) => sum + item.effectiveWatchedEpisodes,
+		0
 	);
 
-	const genreStats = buildGenreStats(genreAccumulatorMap);
+	const watchedRuntimeItems = items.filter(
+		(item) => item.effectiveWatchedEpisodes > 0 && item.watchedRuntimeSeconds !== null
+	);
 
-	const bestGenres = [...genreStats]
-		.filter((genre) => genre.ratedCount >= 3 && genre.averageScore !== null)
-		.sort((a, b) => {
-			const scoreDiff = (b.averageScore ?? 0) - (a.averageScore ?? 0);
+	const watchedRuntimeSeconds = watchedRuntimeItems.reduce(
+		(sum, item) => sum + (item.watchedRuntimeSeconds ?? 0),
+		0
+	);
 
-			if (scoreDiff !== 0) return scoreDiff;
+	const completedRuntimeItems = completedItems.filter(
+		(item) => item.totalRuntimeSeconds !== null && item.watchedRuntimeSeconds !== null
+	);
 
-			return b.count - a.count || a.genre.localeCompare(b.genre);
-		})
-		.slice(0, 12);
+	const uniqueCompletedEpisodeTotal = completedItems.reduce((sum, item) => sum + item.episodes, 0);
 
-	const topRewatches = rewatchRows
-		.sort((a, b) => {
-			const rewatchDiff = b.numberOfTimesRewatched - a.numberOfTimesRewatched;
+	const effectiveCompletedEpisodeTotal = completedItems.reduce(
+		(sum, item) => sum + item.effectiveWatchedEpisodes,
+		0
+	);
 
-			if (rewatchDiff !== 0) return rewatchDiff;
+	const uniqueCompletedRuntimeSeconds = completedRuntimeItems.reduce(
+		(sum, item) => sum + (item.totalRuntimeSeconds ?? 0),
+		0
+	);
 
-			const runtimeDiff =
-				(b.effectiveWatchedRuntimeSeconds ?? 0) - (a.effectiveWatchedRuntimeSeconds ?? 0);
+	const effectiveCompletedRuntimeSeconds = completedRuntimeItems.reduce(
+		(sum, item) => sum + (item.watchedRuntimeSeconds ?? 0),
+		0
+	);
 
-			if (runtimeDiff !== 0) return runtimeDiff;
+	const meanGaps = comparableItems.map((item) => item.gap);
+	const averageMeanGap = average(
+		meanGaps.reduce((sum, gap) => sum + gap, 0),
+		meanGaps.length
+	);
 
-			return a.title.localeCompare(b.title);
-		})
-		.slice(0, 10);
+	const rewatchItems = items.filter((item) => item.rewatchCount > 0);
+	const totalRewatchCount = rewatchItems.reduce((sum, item) => sum + item.rewatchCount, 0);
 
-	const hiddenGems = hiddenGemRows
-		.sort((a, b) => {
-			const gapDiff = b.gap - a.gap;
+	const droppedCount = items.filter((item) => item.status === 'dropped').length;
+	const plannedCount = items.filter((item) => item.status === 'plan_to_watch').length;
 
-			if (gapDiff !== 0) return gapDiff;
+	const genreSummaries = buildGenreSummaries(completedItems);
 
-			const scoreDiff = b.score - a.score;
-
-			if (scoreDiff !== 0) return scoreDiff;
-
-			return a.title.localeCompare(b.title);
-		})
-		.slice(0, 9);
-
-	const overratedByMal = overratedRows
-		.sort((a, b) => {
-			const gapDiff = a.gap - b.gap;
-
-			if (gapDiff !== 0) return gapDiff;
-
-			const meanDiff = b.mean - a.mean;
-
-			if (meanDiff !== 0) return meanDiff;
-
-			return a.title.localeCompare(b.title);
-		})
-		.slice(0, 9);
-
-	const mostObscure = mostObscureRows
-		.sort((a, b) => {
-			const popularityDiff = (b.popularity ?? 0) - (a.popularity ?? 0);
-
-			if (popularityDiff !== 0) return popularityDiff;
-
-			const scoreDiff = b.score - a.score;
-
-			if (scoreDiff !== 0) return scoreDiff;
-
-			const gapDiff = b.gap - a.gap;
-
-			if (gapDiff !== 0) return gapDiff;
-
-			return a.title.localeCompare(b.title);
-		})
-		.slice(0, 6);
+	const topTags = chartByLabel(completedItems, (item) => item.labels.tag, {
+		limit: 8
+	});
 
 	const cards: StatCardValue[] = [
 		{
@@ -780,11 +654,14 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		{
 			label: 'watched time',
 			value: formatDuration(watchedRuntimeSeconds),
-			help: `${formatNumber(watchedRuntimeEntries)} entries with duration`
+			help: `${formatNumber(watchedRuntimeItems.length)} entries with duration`
 		},
 		{
 			label: 'avg score',
-			value: completedRatedCount > 0 ? formatDecimal(averageCompletedScore, 2) : '—',
+			value:
+				completedRatedCount > 0
+					? formatDecimal(average(completedScoreTotal, completedRatedCount), 2)
+					: '—',
 			help: `${formatNumber(completedRatedCount)} completed rated`
 		},
 		{
@@ -799,22 +676,30 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		},
 		{
 			label: 'score spread',
-			value: completedScores.length > 0 ? formatDecimal(scoreStandardDeviation, 2) : '—',
+			value: completedScores.length > 0 ? formatDecimal(standardDeviation(completedScores), 2) : '—',
 			help: 'standard deviation'
 		},
 		{
 			label: 'vs MAL mean',
-			value: completedMeanGapCount > 0 ? formatSignedDecimal(averageMeanGap, 2) : '—',
-			help: `${formatNumber(completedMeanGapCount)} comparable`
+			value: meanGaps.length > 0 ? formatSignedDecimal(averageMeanGap, 2) : '—',
+			help: `${formatNumber(meanGaps.length)} comparable`
 		},
 		{
 			label: 'avg eps/anime',
-			value: completedTotal > 0 ? formatDecimal(averageCompletedEpisodes, 1) : '—',
+			value:
+				completedTotal > 0
+					? formatDecimal(average(effectiveCompletedEpisodeTotal, completedTotal), 1)
+					: '—',
 			help: 'completed, includes rewatches'
 		},
 		{
 			label: 'avg runtime',
-			value: completedRuntimeEntries > 0 ? formatDuration(averageCompletedRuntimeSeconds) : '—',
+			value:
+				completedRuntimeItems.length > 0
+					? formatDuration(
+						average(effectiveCompletedRuntimeSeconds, completedRuntimeItems.length)
+					)
+					: '—',
 			help: 'completed with duration'
 		},
 		{
@@ -829,22 +714,24 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		},
 		{
 			label: 'rewatch time',
-			value: formatDuration(rewatchRuntimeSeconds),
+			value: formatDuration(
+				Math.max(0, effectiveCompletedRuntimeSeconds - uniqueCompletedRuntimeSeconds)
+			),
 			help: 'extra time only'
 		},
 		{
 			label: 'genres',
-			value: formatNumber(genreStats.length),
+			value: formatNumber(genreSummaries.length),
 			help: 'completed entries'
 		},
 		{
 			label: 'runtime coverage',
-			value: toPercentage(completedRuntimeEntries, completedTotal),
+			value: toPercentage(completedRuntimeItems.length, completedTotal),
 			help: 'completed with duration'
 		},
 		{
 			label: 'rewatchers',
-			value: formatNumber(rewatchedEntryCount),
+			value: formatNumber(rewatchItems.length),
 			help: `${formatNumber(totalRewatchCount)} extra watches`
 		},
 		{
@@ -854,98 +741,141 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		}
 	];
 
-	const statusDistribution = [...statusMap.entries()].map(([status, value]) => ({
-		label: STATUS_LABELS[status],
-		value,
-		detail: toPercentage(value, totalEntries)
-	}));
-
-	const scoreDistribution = Array.from({ length: 10 }, (_, index) => {
-		const score = 10 - index;
-		const value = scoreMap.get(score) ?? 0;
-
-		return {
-			label: String(score),
-			value,
-			detail: toPercentage(value, completedRatedCount)
-		};
-	});
-
-	const mediaTypeDistribution = toSortedChartData(mediaTypeMap, {
-		total: completedTotal,
-		limit: 8
-	});
-
-	const episodeDistribution = [...episodeBucketMap.entries()].map(([label, value]) => ({
-		label,
-		value,
-		detail: toPercentage(value, completedTotal)
-	}));
-
-	const genreDistribution = toSortedChartData(genreMap, {
-		total: completedTotal,
-		limit: 10
-	});
-
-	const seasonDistribution = [...seasonMap.entries()].map(([label, value]) => ({
-		label,
-		value,
-		detail: toPercentage(value, completedTotal)
-	}));
-
-	const decadeDistribution = toSortedChartData(decadeMap, {
-		total: completedTotal,
-		sort: 'label'
-	});
-
-	const meanGapDistribution = MEAN_GAP_BUCKETS.map((bucket) => {
-		const value = meanGapMap.get(bucket.label) ?? 0;
-
-		return {
-			label: bucket.label,
-			value,
-			detail: toPercentage(value, completedMeanGapCount)
-		};
-	});
-
-	const topYears = toSortedChartData(yearMap, {
-		total: completedTotal,
-		limit: 8,
-		label: String
-	});
-
-	const topTags = toSortedChartData(tagMap, {
-		limit: 8
-	});
-
-	const longestRuntime = completedRuntimeRows
-		.sort((a, b) => {
-			const runtimeDiff = b.totalRuntimeSeconds - a.totalRuntimeSeconds;
-
-			if (runtimeDiff !== 0) return runtimeDiff;
-
-			return a.title.localeCompare(b.title);
-		})
-		.slice(0, 12);
-
 	return {
+		items,
+		completedItems,
+
 		cards,
-		statusDistribution,
-		scoreDistribution,
-		mediaTypeDistribution,
-		episodeDistribution,
-		genreDistribution,
-		seasonDistribution,
-		decadeDistribution,
-		meanGapDistribution,
-		topYears,
-		topTags,
-		genreStats: genreStats.slice(0, 12),
-		bestGenres,
-		longestRuntime,
-		topRewatches,
-		hiddenGems,
-		overratedByMal,
-		mostObscure
+
+		charts: {
+			status: chartByLabel(items, (item) => item.labels.status, {
+				total: totalEntries,
+				order: STATUS_CHART_ORDER
+			}),
+
+			scores: chartByLabel(completedItems, (item) => item.labels.score, {
+				total: completedRatedCount,
+				order: SCORE_CHART_ORDER
+			}),
+
+			genres: chartByLabel(completedItems, (item) => item.labels.genre, {
+				total: completedTotal,
+				limit: 10
+			}),
+
+			mediaTypes: chartByLabel(completedItems, (item) => item.labels.mediaType, {
+				total: completedTotal,
+				limit: 8
+			}),
+
+			episodes: chartByLabel(completedItems, (item) => item.labels.episodeBucket, {
+				total: completedTotal,
+				order: EPISODE_CHART_ORDER
+			}),
+
+			decades: chartByLabel(completedItems, (item) => item.labels.decade, {
+				total: completedTotal,
+				sort: 'label'
+			}),
+
+			years: chartByLabel(completedItems, (item) => item.labels.year, {
+				total: completedTotal,
+				limit: 8
+			}),
+
+			seasons: chartByLabel(completedItems, (item) => item.labels.season, {
+				total: completedTotal,
+				order: SEASON_CHART_ORDER
+			}),
+
+			meanGap: chartByLabel(comparableItems, (item) => item.labels.meanGap, {
+				total: comparableItems.length,
+				order: MEAN_GAP_CHART_ORDER
+			}),
+
+			tags: topTags
+		},
+
+		details: {
+			status: detailsByLabel(items, (item) => item.labels.status),
+			scores: detailsByLabel(completedItems, (item) => item.labels.score),
+			genres: detailsByLabel(completedItems, (item) => item.labels.genre),
+			mediaTypes: detailsByLabel(completedItems, (item) => item.labels.mediaType),
+			episodes: detailsByLabel(completedItems, (item) => item.labels.episodeBucket),
+			decades: detailsByLabel(completedItems, (item) => item.labels.decade),
+			years: detailsByLabel(completedItems, (item) => item.labels.year),
+			seasons: detailsByLabel(completedItems, (item) => item.labels.season),
+			meanGap: detailsByLabel(comparableItems, (item) => item.labels.meanGap)
+		},
+
+		tables: {
+			longestRuntime: takeSorted(
+				completedItems.filter((item) => item.totalRuntimeSeconds !== null),
+				(a, b) => (b.totalRuntimeSeconds ?? 0) - (a.totalRuntimeSeconds ?? 0) || byTitle(a, b),
+				12
+			).map((item) => ({
+				key: item.id,
+				values: [item.title, item.episodes, item.totalRuntimeLabel]
+			})),
+
+			topRewatches: takeSorted(
+				rewatchItems,
+				(a, b) =>
+					b.rewatchCount - a.rewatchCount ||
+					(b.watchedRuntimeSeconds ?? 0) - (a.watchedRuntimeSeconds ?? 0) ||
+					byTitle(a, b),
+				10
+			).map((item) => ({
+				key: item.id,
+				values: [
+					item.title,
+					item.rewatchCount,
+					item.effectiveWatchedEpisodes,
+					item.watchedRuntimeLabel
+				]
+			})),
+
+			tags: topTags.map((tag) => ({
+				key: tag.label,
+				values: [tag.label, tag.value]
+			})),
+
+			genres: genreSummaries.slice(0, 12).map(toGenreRow),
+
+			bestGenres: takeSorted(
+				genreSummaries.filter((genre) => genre.ratedCount >= 3 && genre.averageScore !== null),
+				(a, b) =>
+					(b.averageScore ?? 0) - (a.averageScore ?? 0) ||
+					b.count - a.count ||
+					a.genre.localeCompare(b.genre),
+				12
+			).map(toGenreRow)
+		},
+
+		spotlights: {
+			hiddenGems: takeSorted(
+				comparableItems.filter((item) => item.score >= 8 && item.mean <= 7.5 && item.gap >= 1),
+				(a, b) => b.gap - a.gap || b.score - a.score || byTitle(a, b),
+				9
+			),
+
+			overratedByMal: takeSorted(
+				comparableItems.filter((item) => item.score <= 6 && item.mean >= 8 && item.gap <= -1),
+				(a, b) => a.gap - b.gap || b.mean - a.mean || byTitle(a, b),
+				9
+			),
+
+			mostObscure: takeSorted(
+				comparableItems.filter(
+					(item) => item.score >= 8 && item.popularity !== null && item.popularity >= 1000
+				),
+				(a, b) =>
+					(b.popularity ?? 0) - (a.popularity ?? 0) ||
+					b.score - a.score ||
+					b.gap - a.gap ||
+					byTitle(a, b),
+				6
+			)
+		}
 	};
 };

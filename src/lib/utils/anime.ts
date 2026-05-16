@@ -15,8 +15,37 @@ type FilterAndSortAnimesParams = {
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
 
-const compareTitles = (a: Anime, b: Anime) => {
+const byTitle = (a: { title: string }, b: { title: string }) => {
 	return a.title.localeCompare(b.title);
+};
+
+const applyDirection = (value: number, direction: SortDirection) => {
+	return direction === 'asc' ? value : -value;
+};
+
+const animeSortValue: Record<AnimeSortMetric, (anime: Anime) => SortableValue> = {
+	score: (anime) => {
+		return anime.customScore && anime.customScore > 0 ? anime.customScore : null;
+	},
+
+	title: (anime) => {
+		return anime.title.toLowerCase();
+	},
+
+	year: (anime) => {
+		const year = anime.startSeason?.year;
+
+		if (!year) return null;
+
+		const season = anime.startSeason?.season?.toLowerCase();
+		const seasonWeight = season ? (SEASON_ORDER[season] ?? 0) : 0;
+
+		return year * 10 + seasonWeight;
+	},
+
+	totalEpisodes: (anime) => {
+		return anime.totalEpisodes;
+	}
 };
 
 export const filterByTitle = <T extends { title: string }>(items: T[], query: string) => {
@@ -24,34 +53,11 @@ export const filterByTitle = <T extends { title: string }>(items: T[], query: st
 
 	if (!normalizedQuery) return items;
 
-	return items.filter((item) => {
-		return item.title.toLowerCase().includes(normalizedQuery);
-	});
+	return items.filter((item) => item.title.toLowerCase().includes(normalizedQuery));
 };
 
-export const getAnimeSortValue = (anime: Anime, metric: AnimeSortMetric): SortableValue => {
-	switch (metric) {
-		case 'score':
-			return anime.customScore && anime.customScore > 0 ? anime.customScore : null;
-
-		case 'title':
-			return anime.title.toLowerCase();
-
-		case 'year': {
-			const year = anime.startSeason?.year;
-
-			if (!year) return null;
-
-			const season = anime.startSeason?.season
-				? (SEASON_ORDER[anime.startSeason.season.toLowerCase()] ?? 0)
-				: 0;
-
-			return year * 10 + season;
-		}
-
-		case 'totalEpisodes':
-			return anime.totalEpisodes;
-	}
+export const getAnimeSortValue = (anime: Anime, metric: AnimeSortMetric) => {
+	return animeSortValue[metric](anime);
 };
 
 export const sortAnimes = (
@@ -63,52 +69,35 @@ export const sortAnimes = (
 		const aValue = getAnimeSortValue(a, sortMetric);
 		const bValue = getAnimeSortValue(b, sortMetric);
 
-		const aMissing = aValue === null;
-		const bMissing = bValue === null;
-
-		if (aMissing || bMissing) {
-			if (aMissing && bMissing) return compareTitles(a, b);
-			return aMissing ? 1 : -1;
+		if (aValue === null || bValue === null) {
+			if (aValue === null && bValue === null) return byTitle(a, b);
+			return aValue === null ? 1 : -1;
 		}
 
-		if (typeof aValue === 'string' && typeof bValue === 'string') {
-			const result = aValue.localeCompare(bValue);
+		const result =
+			typeof aValue === 'string' && typeof bValue === 'string'
+				? aValue.localeCompare(bValue)
+				: Number(aValue) - Number(bValue);
 
-			if (result !== 0) {
-				return sortDirection === 'asc' ? result : -result;
-			}
-
-			return compareTitles(a, b);
-		}
-
-		const result = Number(aValue) - Number(bValue);
-
-		if (result !== 0) {
-			return sortDirection === 'asc' ? result : -result;
-		}
-
-		return compareTitles(a, b);
+		return result === 0 ? byTitle(a, b) : applyDirection(result, sortDirection);
 	});
 };
 
 export const filterAndSortAnimes = ({
-	animes,
-	status,
-	query,
-	sortMetric,
-	sortDirection
-}: FilterAndSortAnimesParams) => {
+																			animes,
+																			status,
+																			query,
+																			sortMetric,
+																			sortDirection
+																		}: FilterAndSortAnimesParams) => {
 	const statusFiltered =
 		status === 'all' ? animes : animes.filter((anime) => anime.status === status);
 
-	const titleFiltered = filterByTitle(statusFiltered, query);
-
-	return sortAnimes(titleFiltered, sortMetric, sortDirection);
+	return sortAnimes(filterByTitle(statusFiltered, query), sortMetric, sortDirection);
 };
 
 export const mergeUniqueById = <T extends { id: string | number }>(current: T[], incoming: T[]) => {
 	const seenIds = new Set(current.map((item) => item.id));
-	const newItems = incoming.filter((item) => !seenIds.has(item.id));
 
-	return [...current, ...newItems];
+	return [...current, ...incoming.filter((item) => !seenIds.has(item.id))];
 };
