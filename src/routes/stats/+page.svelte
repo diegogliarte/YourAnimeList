@@ -438,6 +438,7 @@
 						description="Completed anime with 8+ score and popularity rank over #1,000."
 						items={stats.mostObscure}
 						emptyMessage="No obscure high-rated picks found yet."
+						footerMetric="popularity"
 					/>
 				</div>
 			</div>

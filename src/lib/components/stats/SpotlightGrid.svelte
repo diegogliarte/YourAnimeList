@@ -1,17 +1,35 @@
 <script lang="ts">
 	import type { AnimeSpotlightStat } from '$lib/utils/anime-stats';
 
+	type FooterMetric = 'mean' | 'popularity';
+
 	type Props = {
 		title: string;
 		description: string;
 		items: AnimeSpotlightStat[];
 		emptyMessage: string;
 		limit?: number;
+		footerMetric?: FooterMetric;
 	};
 
-	let { title, description, items, emptyMessage, limit = 6 }: Props = $props();
+	let {
+		title,
+		description,
+		items,
+		emptyMessage,
+		limit = 6,
+		footerMetric = 'mean'
+	}: Props = $props();
 
 	const visibleItems = $derived(items.slice(0, limit));
+
+	const getFooterLabel = (item: AnimeSpotlightStat) => {
+		if (footerMetric === 'popularity') {
+			return item.popularityLabel ?? 'unknown popularity';
+		}
+
+		return `MAL ${item.meanLabel}`;
+	};
 </script>
 
 <section class="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
@@ -52,12 +70,14 @@
 						<div class="flex items-center justify-between gap-2 text-[11px]">
 							<span class="text-neutral-400">you {item.scoreLabel}</span>
 							<span class={item.gap > 0 ? 'text-emerald-300' : 'text-red-300'}>
-				{item.gapLabel}
-			</span>
+								{item.gapLabel}
+							</span>
 						</div>
+
 						<p class="truncate text-[11px] text-neutral-500">
-							{item.popularityLabel ?? `MAL ${item.meanLabel}`}
-						</p>					</div>
+							{getFooterLabel(item)}
+						</p>
+					</div>
 				</a>
 			{/each}
 		</div>
