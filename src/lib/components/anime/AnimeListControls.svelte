@@ -39,13 +39,7 @@
 
 <div class="border-b border-white/10 bg-background px-3 py-2">
 	<div class="flex flex-col gap-2">
-		<SearchSummaryBar
-			{username}
-			{visibleCount}
-			{totalCount}
-			{search}
-			onSearchChange={onSearchChange}
-		/>
+		<SearchSummaryBar {username} {visibleCount} {totalCount} {search} {onSearchChange} />
 
 		<ControlRow label="filter">
 			{#each STATUS_FILTERS as option (option.value)}
@@ -60,10 +54,7 @@
 
 		<ControlRow label="sort">
 			{#each SORT_OPTIONS as option (option.value)}
-				<PillButton
-					active={sortMetric === option.value}
-					onclick={() => onSortChange(option.value)}
-				>
+				<PillButton active={sortMetric === option.value} onclick={() => onSortChange(option.value)}>
 					{option.label}
 				</PillButton>
 			{/each}

@@ -56,7 +56,9 @@
 								class="h-full w-full object-cover"
 							/>
 						{:else}
-							<div class="flex h-full items-center justify-center px-2 text-center text-xs text-neutral-600">
+							<div
+								class="flex h-full items-center justify-center px-2 text-center text-xs text-neutral-600"
+							>
 								no image
 							</div>
 						{/if}

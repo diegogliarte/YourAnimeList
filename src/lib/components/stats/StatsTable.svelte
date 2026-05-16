@@ -32,27 +32,27 @@
 	{:else}
 		<table class="w-full text-left text-xs">
 			<thead class="border-b border-white/10 text-neutral-500">
-			<tr>
-				{#each headers as header}
-					<th class="px-3 py-1.5 font-medium">
-						{header}
-					</th>
-				{/each}
-			</tr>
+				<tr>
+					{#each headers as header}
+						<th class="px-3 py-1.5 font-medium">
+							{header}
+						</th>
+					{/each}
+				</tr>
 			</thead>
 
 			<tbody>
-			{#each rows as row (row.key)}
-				<tr class="border-b border-white/5 last:border-b-0">
-					{#each row.values as value, index}
-						<td class="px-3 py-1.5 text-neutral-300">
+				{#each rows as row (row.key)}
+					<tr class="border-b border-white/5 last:border-b-0">
+						{#each row.values as value, index}
+							<td class="px-3 py-1.5 text-neutral-300">
 								<span class={index === 0 ? 'line-clamp-1' : ''} title={String(value ?? '')}>
 									{value ?? '-'}
 								</span>
-						</td>
-					{/each}
-				</tr>
-			{/each}
+							</td>
+						{/each}
+					</tr>
+				{/each}
 			</tbody>
 		</table>
 	{/if}

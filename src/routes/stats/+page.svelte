@@ -178,9 +178,7 @@
 	);
 
 	const statusDetails = $derived(
-		groupAnimeTitlesByLabel(listState.data?.animes ?? [], (anime) => [
-			STATUS_LABELS[anime.status]
-		])
+		groupAnimeTitlesByLabel(listState.data?.animes ?? [], (anime) => [STATUS_LABELS[anime.status]])
 	);
 
 	const scoreDetails = $derived(
@@ -248,7 +246,10 @@
 	const genreRows: StatsTableRow[] = $derived(stats ? toGenreRows(stats.genreStats) : []);
 	const bestGenreRows: StatsTableRow[] = $derived(stats ? toGenreRows(stats.bestGenres) : []);
 
-	const syncUrl = (username = listState.loadedUsername || listState.username, replaceState = true) => {
+	const syncUrl = (
+		username = listState.loadedUsername || listState.username,
+		replaceState = true
+	) => {
 		const href = buildAnimeStatsHref({
 			username
 		});
@@ -374,11 +375,7 @@
 						detailsByLabel={decadeDetails}
 					/>
 
-					<BarChart
-						title="completed years"
-						items={stats.topYears}
-						detailsByLabel={yearDetails}
-					/>
+					<BarChart title="completed years" items={stats.topYears} detailsByLabel={yearDetails} />
 				</div>
 
 				<div class="grid gap-2 lg:grid-cols-2">

@@ -43,7 +43,7 @@ export const getAnimeSortValue = (anime: Anime, metric: AnimeSortMetric): Sortab
 			if (!year) return null;
 
 			const season = anime.startSeason?.season
-				? SEASON_ORDER[anime.startSeason.season.toLowerCase()] ?? 0
+				? (SEASON_ORDER[anime.startSeason.season.toLowerCase()] ?? 0)
 				: 0;
 
 			return year * 10 + season;
@@ -92,12 +92,12 @@ export const sortAnimes = (
 };
 
 export const filterAndSortAnimes = ({
-																			animes,
-																			status,
-																			query,
-																			sortMetric,
-																			sortDirection
-																		}: FilterAndSortAnimesParams) => {
+	animes,
+	status,
+	query,
+	sortMetric,
+	sortDirection
+}: FilterAndSortAnimesParams) => {
 	const statusFiltered =
 		status === 'all' ? animes : animes.filter((anime) => anime.status === status);
 

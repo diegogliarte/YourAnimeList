@@ -32,7 +32,9 @@
 	let sentinelEl = $state<HTMLDivElement | null>(null);
 
 	const hasMore = $derived(rankingsState.nextOffset !== null);
-	const filteredAnimes = $derived(filterByTitle(rankingsState.data?.animes ?? [], rankingsState.search));
+	const filteredAnimes = $derived(
+		filterByTitle(rankingsState.data?.animes ?? [], rankingsState.search)
+	);
 
 	const syncUrl = (
 		overrides: Partial<{
@@ -61,12 +63,12 @@
 	};
 
 	const loadRankings = async ({
-																targetUsername = rankingsState.username,
-																offset = 0,
-																append = false,
-																requestRankingType = rankingsState.rankingType,
-																requestExcludedStatuses = rankingsState.excludedStatuses
-															}: {
+		targetUsername = rankingsState.username,
+		offset = 0,
+		append = false,
+		requestRankingType = rankingsState.rankingType,
+		requestExcludedStatuses = rankingsState.excludedStatuses
+	}: {
 		targetUsername?: string;
 		offset?: number;
 		append?: boolean;
@@ -124,9 +126,9 @@
 	};
 
 	const reloadRankings = ({
-														nextRankingType = rankingsState.rankingType,
-														nextExcludedStatuses = rankingsState.excludedStatuses
-													}: {
+		nextRankingType = rankingsState.rankingType,
+		nextExcludedStatuses = rankingsState.excludedStatuses
+	}: {
 		nextRankingType?: AnimeRankingType;
 		nextExcludedStatuses?: ApiAnimeStatus[];
 	} = {}) => {
@@ -283,9 +285,7 @@
 					{/if}
 				</div>
 			{:else}
-				<div class="px-3 py-4 text-center text-xs text-neutral-600">
-					end of rankings
-				</div>
+				<div class="px-3 py-4 text-center text-xs text-neutral-600">end of rankings</div>
 			{/if}
 		</ResultsPanel>
 	{:else}

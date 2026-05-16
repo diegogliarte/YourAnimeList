@@ -1,10 +1,6 @@
 import { json } from '@sveltejs/kit';
 
-import {
-	fetchAnimeRanking,
-	isAnimeRankingType,
-	isApiAnimeStatus
-} from '$lib/server/mal';
+import { fetchAnimeRanking, isAnimeRankingType, isApiAnimeStatus } from '$lib/server/mal';
 
 import type { ApiAnimeStatus } from '$lib/types/anime';
 
@@ -26,11 +22,11 @@ const parseExcludedStatuses = (value: string | null): ApiAnimeStatus[] => {
 };
 
 const parseInteger = ({
-												value,
-												fallback,
-												min,
-												max
-											}: {
+	value,
+	fallback,
+	min,
+	max
+}: {
 	value: string | null;
 	fallback: number;
 	min: number;
@@ -48,9 +44,7 @@ export const GET = async ({ url }) => {
 		const username = url.searchParams.get('username')?.trim() || undefined;
 
 		const requestedRankingType = url.searchParams.get('rankingType');
-		const rankingType = isAnimeRankingType(requestedRankingType)
-			? requestedRankingType
-			: 'all';
+		const rankingType = isAnimeRankingType(requestedRankingType) ? requestedRankingType : 'all';
 
 		const excludedStatuses = parseExcludedStatuses(url.searchParams.get('exclude'));
 

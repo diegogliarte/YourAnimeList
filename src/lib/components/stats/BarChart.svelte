@@ -12,12 +12,7 @@
 		emptyMessage?: string;
 	};
 
-	let {
-		title,
-		items,
-		detailsByLabel = {},
-		emptyMessage = 'No data.'
-	}: Props = $props();
+	let { title, items, detailsByLabel = {}, emptyMessage = 'No data.' }: Props = $props();
 
 	let expandedLabel = $state<string | null>(null);
 
@@ -82,7 +77,7 @@
 						<div class="mt-2">
 							<div class="space-y-1">
 								{#each rows as title}
-									<p class="line-clamp-1 text-xs text-neutral-300" title={title}>
+									<p class="line-clamp-1 text-xs text-neutral-300" {title}>
 										{title}
 									</p>
 								{/each}

@@ -9,7 +9,7 @@
 </script>
 
 <article class="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
-	<p class="text-[0.65rem] font-medium uppercase tracking-wide text-neutral-500">
+	<p class="text-[0.65rem] font-medium tracking-wide text-neutral-500 uppercase">
 		{label}
 	</p>
 

@@ -1,9 +1,4 @@
-export type ApiAnimeStatus =
-	| 'watching'
-	| 'completed'
-	| 'on_hold'
-	| 'dropped'
-	| 'plan_to_watch';
+export type ApiAnimeStatus = 'watching' | 'completed' | 'on_hold' | 'dropped' | 'plan_to_watch';
 
 export type AnimeSortMetric = 'score' | 'title' | 'year' | 'totalEpisodes';
 

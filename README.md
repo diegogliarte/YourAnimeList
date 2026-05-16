@@ -15,35 +15,35 @@ It lets you search a MAL username, inspect their anime list, filter by list stat
 - Search any public MyAnimeList profile.
 - View anime in a compact table layout.
 - Filter by status:
-    - all
-    - completed
-    - watching
-    - on hold
-    - dropped
-    - plan to watch
+  - all
+  - completed
+  - watching
+  - on hold
+  - dropped
+  - plan to watch
 - Sort by:
-    - score
-    - title
-    - year
-    - episodes
+  - score
+  - title
+  - year
+  - episodes
 - View useful anime metadata:
-    - title
-    - cover image
-    - score
-    - watched episodes
-    - total episodes
-    - season and year
+  - title
+  - cover image
+  - score
+  - watched episodes
+  - total episodes
+  - season and year
 - Rankings tab powered by MAL rankings.
 - Filter rankings by type:
-    - top
-    - airing
-    - upcoming
-    - TV
-    - movies
-    - OVA
-    - specials
-    - popularity
-    - favorites
+  - top
+  - airing
+  - upcoming
+  - TV
+  - movies
+  - OVA
+  - specials
+  - popularity
+  - favorites
 - Hide top animes already present in the user's list.
 - Infinite scrolling for ranking results.
 - URL state for filters, sorting, search, and username.
@@ -63,3 +63,4 @@ Create a `.env` file with:
 ```env
 MAL_CLIENT_ID=your_mal_client_id
 MAL_USERNAME=your_private_mal_username
+```

@@ -43,10 +43,5 @@
 		</span>
 	</p>
 
-	<Input
-		class="w-40"
-		{placeholder}
-		value={search}
-		oninput={handleInput}
-	/>
+	<Input class="w-40" {placeholder} value={search} oninput={handleInput} />
 </div>

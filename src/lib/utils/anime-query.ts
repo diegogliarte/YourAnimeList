@@ -104,12 +104,12 @@ export const parseAnimeStatsQuery = (url: URL): AnimeStatsQueryState => {
 };
 
 export const buildAnimeListHref = ({
-																		 username,
-																		 search,
-																		 status,
-																		 sort,
-																		 direction
-																	 }: AnimeListQueryState) => {
+	username,
+	search,
+	status,
+	sort,
+	direction
+}: AnimeListQueryState) => {
 	const params = new URLSearchParams();
 
 	withOptionalParam(params, 'username', username);
@@ -124,12 +124,12 @@ export const buildAnimeListHref = ({
 };
 
 export const buildAnimeRankingsHref = ({
-																				 username,
-																				 search,
-																				 rankingType,
-																				 excludedStatuses,
-																				 showScore
-																			 }: AnimeRankingsQueryState) => {
+	username,
+	search,
+	rankingType,
+	excludedStatuses,
+	showScore
+}: AnimeRankingsQueryState) => {
 	const params = new URLSearchParams();
 
 	withOptionalParam(params, 'username', username);

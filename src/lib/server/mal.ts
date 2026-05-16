@@ -331,9 +331,9 @@ const mapRankingEntry = (
 };
 
 export const fetchUserAnimeList = async ({
-																					 username,
-																					 status
-																				 }: {
+	username,
+	status
+}: {
 	username: string;
 	status?: ApiAnimeStatus;
 }): Promise<AnimeApiResponse> => {
@@ -409,12 +409,12 @@ const fetchUserStatusMap = async (malUsername: string): Promise<Map<number, ApiA
 };
 
 export const fetchAnimeRanking = async ({
-																					username,
-																					rankingType = 'all',
-																					excludedStatuses = ['completed'],
-																					limit = 100,
-																					offset = 0
-																				}: {
+	username,
+	rankingType = 'all',
+	excludedStatuses = ['completed'],
+	limit = 100,
+	offset = 0
+}: {
 	username?: string;
 	rankingType?: AnimeRankingType;
 	excludedStatuses?: ApiAnimeStatus[];

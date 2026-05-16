@@ -54,12 +54,12 @@ export const fetchAnimeList = async (username: string) => {
 };
 
 export const fetchAnimeRankings = async ({
-																					 username,
-																					 rankingType,
-																					 excludedStatuses,
-																					 limit,
-																					 offset
-																				 }: FetchAnimeRankingsParams) => {
+	username,
+	rankingType,
+	excludedStatuses,
+	limit,
+	offset
+}: FetchAnimeRankingsParams) => {
 	const params = new URLSearchParams({
 		username,
 		rankingType,

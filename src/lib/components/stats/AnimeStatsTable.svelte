@@ -9,13 +9,7 @@
 		emptyMessage?: string;
 	};
 
-	let {
-		title,
-		animes,
-		valueLabel,
-		getValue,
-		emptyMessage = 'No data.'
-	}: Props = $props();
+	let { title, animes, valueLabel, getValue, emptyMessage = 'No data.' }: Props = $props();
 </script>
 
 <section class="overflow-hidden rounded-lg border border-white/10 bg-white/[0.03]">
@@ -32,23 +26,23 @@
 	{:else}
 		<table class="w-full text-left text-xs">
 			<thead class="border-b border-white/10 text-neutral-500">
-			<tr>
-				<th class="px-3 py-2 font-medium">title</th>
-				<th class="px-3 py-2 text-right font-medium">{valueLabel}</th>
-			</tr>
+				<tr>
+					<th class="px-3 py-2 font-medium">title</th>
+					<th class="px-3 py-2 text-right font-medium">{valueLabel}</th>
+				</tr>
 			</thead>
 
 			<tbody>
-			{#each animes as anime (anime.id)}
-				<tr class="border-b border-white/5 last:border-b-0">
-					<td class="px-3 py-2 text-neutral-300">
-						<span class="line-clamp-1">{anime.title}</span>
-					</td>
-					<td class="px-3 py-2 text-right text-neutral-400">
-						{getValue(anime)}
-					</td>
-				</tr>
-			{/each}
+				{#each animes as anime (anime.id)}
+					<tr class="border-b border-white/5 last:border-b-0">
+						<td class="px-3 py-2 text-neutral-300">
+							<span class="line-clamp-1">{anime.title}</span>
+						</td>
+						<td class="px-3 py-2 text-right text-neutral-400">
+							{getValue(anime)}
+						</td>
+					</tr>
+				{/each}
 			</tbody>
 		</table>
 	{/if}

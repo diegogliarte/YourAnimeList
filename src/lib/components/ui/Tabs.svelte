@@ -12,7 +12,9 @@
 	let { tabs }: Props = $props();
 </script>
 
-<nav class="inline-flex rounded-md border border-white/10 bg-neutral-950/80 p-0.5 shadow-sm shadow-black/20">
+<nav
+	class="inline-flex rounded-md border border-white/10 bg-neutral-950/80 p-0.5 shadow-sm shadow-black/20"
+>
 	{#each tabs as tab}
 		<a
 			href={tab.href}

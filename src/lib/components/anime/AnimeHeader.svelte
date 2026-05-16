@@ -78,14 +78,14 @@
 			</nav>
 		</div>
 
-		<form class="flex flex-col gap-2 sm:flex-row" onsubmit={(event) => {
-			event.preventDefault();
-			handleSubmit();
-		}}>
-			<Input
-				placeholder="MAL username"
-				bind:value={username}
-			/>
+		<form
+			class="flex flex-col gap-2 sm:flex-row"
+			onsubmit={(event) => {
+				event.preventDefault();
+				handleSubmit();
+			}}
+		>
+			<Input placeholder="MAL username" bind:value={username} />
 
 			<button
 				type="submit"
