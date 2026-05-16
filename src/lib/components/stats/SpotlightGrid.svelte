@@ -55,9 +55,9 @@
 				{item.gapLabel}
 			</span>
 						</div>
-
-						<p class="text-[11px] text-neutral-500">MAL {item.meanLabel}</p>
-					</div>
+						<p class="truncate text-[11px] text-neutral-500">
+							{item.popularityLabel ?? `MAL ${item.meanLabel}`}
+						</p>					</div>
 				</a>
 			{/each}
 		</div>

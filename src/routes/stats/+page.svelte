@@ -432,6 +432,13 @@
 						items={stats.overratedByMal}
 						emptyMessage="No clearly overrated picks found yet."
 					/>
+
+					<SpotlightGrid
+						title="most obscure"
+						description="Completed anime with 8+ score and popularity rank over #1,000."
+						items={stats.mostObscure}
+						emptyMessage="No obscure high-rated picks found yet."
+					/>
 				</div>
 			</div>
 		</ResultsPanel>

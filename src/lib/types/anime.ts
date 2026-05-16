@@ -42,6 +42,7 @@ export type Anime = {
 	totalEpisodes: number | null;
 	averageEpisodeDuration: number | null;
 	mean: number | null;
+	popularity: number | null;
 	mediaType: string | null;
 	animeStatus: string | null;
 	startSeason: AnimeSeason | null;

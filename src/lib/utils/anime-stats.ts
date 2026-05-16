@@ -64,7 +64,8 @@ export type AnimeSpotlightStat = {
 	meanLabel: string;
 	gap: number;
 	gapLabel: string;
-
+	popularity: number | null;
+	popularityLabel: string | null;
 };
 
 export type AnimeStats = {
@@ -85,6 +86,7 @@ export type AnimeStats = {
 	topRewatches: RewatchAnimeStat[];
 	hiddenGems: AnimeSpotlightStat[];
 	overratedByMal: AnimeSpotlightStat[];
+	mostObscure: AnimeSpotlightStat[];
 };
 
 const STATUS_LABELS: Record<ApiAnimeStatus, string> = {
@@ -296,6 +298,10 @@ const getIntegerScore = (anime: Anime) => {
 	return Math.floor(score);
 };
 
+const getPopularity = (anime: Anime) => {
+	return anime.popularity ?? null;
+};
+
 const getYear = (anime: Anime) => {
 	return anime.startSeason?.year ?? null;
 };
@@ -403,6 +409,8 @@ const buildSpotlightRow = (
 	mean: number,
 	gap: number
 ): AnimeSpotlightStat => {
+	const popularity = getPopularity(anime);
+
 	return {
 		id: anime.id,
 		title: anime.title,
@@ -413,7 +421,9 @@ const buildSpotlightRow = (
 		mean,
 		meanLabel: formatDecimal(mean, 2),
 		gap,
-		gapLabel: formatSignedDecimal(gap, 2)
+		gapLabel: formatSignedDecimal(gap, 2),
+		popularity,
+		popularityLabel: popularity === null ? null : `#${formatNumber(popularity)} popularity`
 	};
 };
 
@@ -507,6 +517,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 	const rewatchRows: RewatchAnimeStat[] = [];
 	const hiddenGemRows: AnimeSpotlightStat[] = [];
 	const overratedRows: AnimeSpotlightStat[] = [];
+	const mostObscureRows: AnimeSpotlightStat[] = [];
 
 	for (const option of EXCLUDE_STATUS_OPTIONS) {
 		statusMap.set(option.value, 0);
@@ -567,7 +578,9 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 			completedScores.push(score);
 		}
 
-		if (score !== null && mean !== null) {
+		const isTVOrMovieOrOva = ['tv', 'movie', 'ova'].includes(normalizeMediaType(anime.mediaType));
+
+		if (score !== null && mean !== null && isTVOrMovieOrOva) {
 			const gap = score - mean;
 
 			completedMeanGapTotal += gap;
@@ -576,6 +589,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 			increment(meanGapMap, getMeanGapBucketLabel(gap));
 
 			const spotlightRow = buildSpotlightRow(anime, score, mean, gap);
+			const popularity = getPopularity(anime);
 
 			if (score >= 8 && mean <= 7.5 && gap >= 1) {
 				hiddenGemRows.push(spotlightRow);
@@ -583,6 +597,10 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 
 			if (score <= 6 && mean >= 8 && gap <= -1) {
 				overratedRows.push(spotlightRow);
+			}
+
+			if (score >= 8 && popularity !== null && popularity >= 1000) {
+				mostObscureRows.push(spotlightRow);
 			}
 		}
 
@@ -729,6 +747,24 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 			return a.title.localeCompare(b.title);
 		})
 		.slice(0, 9);
+
+	const mostObscure = mostObscureRows
+		.sort((a, b) => {
+			const popularityDiff = (b.popularity ?? 0) - (a.popularity ?? 0);
+
+			if (popularityDiff !== 0) return popularityDiff;
+
+			const scoreDiff = b.score - a.score;
+
+			if (scoreDiff !== 0) return scoreDiff;
+
+			const gapDiff = b.gap - a.gap;
+
+			if (gapDiff !== 0) return gapDiff;
+
+			return a.title.localeCompare(b.title);
+		})
+		.slice(0, 6);
 
 	const cards: StatCardValue[] = [
 		{
@@ -909,6 +945,7 @@ export const buildAnimeStats = (animes: Anime[]): AnimeStats => {
 		longestRuntime,
 		topRewatches,
 		hiddenGems,
-		overratedByMal
+		overratedByMal,
+		mostObscure
 	};
 };
