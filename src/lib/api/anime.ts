@@ -1,72 +1,95 @@
 import type {
 	AnimeApiResponse,
+	AnimeFranchiseApiResponse,
 	AnimeRankingApiResponse,
 	AnimeRankingType,
 	ApiAnimeStatus
 } from '$lib/types/anime';
 
-type ApiErrorPayload = {
-	error?: string;
-	detail?: string;
+const readError = async (response: Response) => {
+	const payload = (await response.json().catch(() => null)) as {
+		message?: string;
+	} | null;
+
+	return payload?.message ?? `Request failed with ${response.status}.`;
 };
 
-type FetchAnimeRankingsParams = {
-	username: string;
+export const fetchAnimeList = async (username: string): Promise<AnimeApiResponse> => {
+	const params = new URLSearchParams();
+
+	params.set('username', username);
+
+	const response = await fetch(`/api/list?${params.toString()}`);
+
+	if (!response.ok) {
+		throw new Error(await readError(response));
+	}
+
+	return response.json() as Promise<AnimeApiResponse>;
+};
+
+export const fetchAnimeRankings = async ({
+																					 username,
+																					 rankingType,
+																					 excludedStatuses,
+																					 limit,
+																					 offset
+																				 }: {
+	username?: string;
 	rankingType: AnimeRankingType;
 	excludedStatuses: ApiAnimeStatus[];
 	limit: number;
 	offset: number;
-};
+}): Promise<AnimeRankingApiResponse> => {
+	const params = new URLSearchParams();
 
-const readJson = async <T>(response: Response): Promise<T | null> => {
-	try {
-		return (await response.json()) as T;
-	} catch {
-		return null;
+	if (username?.trim()) {
+		params.set('username', username.trim());
 	}
-};
 
-const getResponseError = (response: Response, payload: ApiErrorPayload | null) => {
-	return payload?.detail || payload?.error || `Request failed with ${response.status}`;
-};
+	params.set('rankingType', rankingType);
+	params.set('limit', String(limit));
+	params.set('offset', String(offset));
 
-const fetchJson = async <T>(url: string): Promise<T> => {
-	const response = await fetch(url);
-	const payload = await readJson<T & ApiErrorPayload>(response);
+	if (excludedStatuses.length === 0) {
+		params.set('exclude', 'none');
+	} else {
+		params.set('exclude', excludedStatuses.join(','));
+	}
+
+	const response = await fetch(`/api/rankings?${params.toString()}`);
 
 	if (!response.ok) {
-		throw new Error(getResponseError(response, payload));
+		throw new Error(await readError(response));
 	}
 
-	if (!payload) {
-		throw new Error('Empty response from server.');
+	return response.json() as Promise<AnimeRankingApiResponse>;
+};
+
+export const searchAnimeFranchise = async (query: string): Promise<AnimeFranchiseApiResponse> => {
+	const params = new URLSearchParams();
+
+	params.set('q', query.trim());
+
+	const response = await fetch(`/api/franchise?${params.toString()}`);
+
+	if (!response.ok) {
+		throw new Error(await readError(response));
 	}
 
-	return payload;
+	return response.json() as Promise<AnimeFranchiseApiResponse>;
 };
 
-export const fetchAnimeList = async (username: string) => {
-	const params = new URLSearchParams({
-		username
-	});
+export const fetchAnimeFranchise = async (animeId: number): Promise<AnimeFranchiseApiResponse> => {
+	const params = new URLSearchParams();
 
-	return fetchJson<AnimeApiResponse>(`/api/animes?${params.toString()}`);
-};
+	params.set('id', String(animeId));
 
-export const fetchAnimeRankings = async ({
-	username,
-	rankingType,
-	excludedStatuses,
-	limit,
-	offset
-}: FetchAnimeRankingsParams) => {
-	const params = new URLSearchParams({
-		username,
-		rankingType,
-		limit: String(limit),
-		offset: String(offset),
-		exclude: excludedStatuses.length === 0 ? 'none' : excludedStatuses.join(',')
-	});
+	const response = await fetch(`/api/franchise?${params.toString()}`);
 
-	return fetchJson<AnimeRankingApiResponse>(`/api/rankings?${params.toString()}`);
+	if (!response.ok) {
+		throw new Error(await readError(response));
+	}
+
+	return response.json() as Promise<AnimeFranchiseApiResponse>;
 };

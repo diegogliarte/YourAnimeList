@@ -1,6 +1,6 @@
 import { goto } from '$app/navigation';
 
-import { fetchAnimeList, fetchAnimeRankings } from '$lib/api/anime';
+import { fetchAnimeFranchise, fetchAnimeList, fetchAnimeRankings } from '$lib/api/anime';
 import {
 	DEFAULT_SORT_DIRECTION,
 	DEFAULT_SORT_METRIC,
@@ -11,9 +11,13 @@ import { getAnimeCacheContext } from '$lib/state/anime-cache.svelte';
 import { filterAndSortAnimes, filterByTitle, mergeUniqueById } from '$lib/utils/anime';
 import { buildAnimeStats } from '$lib/utils/anime-stats';
 
-import type { AnimeStatusSelection } from '$lib/constants/anime';
-import type { AnimeRankingType, ApiAnimeStatus, SortDirection } from '$lib/types/anime';
 import type {
+	AnimeFranchiseApiResponse,
+	AnimeRankingType,
+	ApiAnimeStatus
+} from '$lib/types/anime';
+import type {
+	AnimeFranchiseQueryState,
 	AnimeListQueryState,
 	AnimeRankingsQueryState,
 	AnimeStatsQueryState
@@ -462,5 +466,131 @@ export const createAnimeRankingsPage = ({
 		setRankingType,
 		setExcludedStatuses,
 		toggleScore
+	};
+};
+
+export const createAnimeFranchisePage = ({
+																					 query,
+																					 buildHref
+																				 }: {
+	query: AnimeFranchiseQueryState;
+	buildHref: (query: AnimeFranchiseQueryState) => string;
+}) => {
+	let search = $state(query.search);
+	let selectedId = $state<number | null>(query.id);
+	let loading = $state(false);
+	let error = $state<string | null>(null);
+	let data = $state<AnimeFranchiseApiResponse | null>(null);
+
+	const syncUrl = (patch: Partial<AnimeFranchiseQueryState> = {}, replaceState = true) => {
+		go(
+			buildHref({
+				search,
+				id: selectedId,
+				...patch
+			}),
+			replaceState
+		);
+	};
+
+	const load = async ({
+												nextSearch = search,
+												animeId = selectedId,
+												replaceState = false
+											}: {
+		nextSearch?: string;
+		animeId?: number | null;
+		replaceState?: boolean;
+	} = {}) => {
+		const trimmedSearch = nextSearch.trim();
+
+		if (!trimmedSearch && !animeId) {
+			error = 'Enter an anime title.';
+			return;
+		}
+
+		try {
+			loading = true;
+			error = null;
+
+			const result = await fetchAnimeFranchise({
+				query: trimmedSearch,
+				animeId
+			});
+
+			data = result;
+			search = result.query || trimmedSearch;
+			selectedId = result.selectedAnime?.id ?? animeId ?? null;
+
+			syncUrl(
+				{
+					search,
+					id: selectedId
+				},
+				replaceState
+			);
+		} catch (err) {
+			error = getErrorMessage(err);
+		} finally {
+			loading = false;
+		}
+	};
+
+	const submit = () => {
+		selectedId = null;
+
+		void load({
+			nextSearch: search,
+			animeId: null
+		});
+	};
+
+	const selectAnime = (animeId: number) => {
+		selectedId = animeId;
+
+		void load({
+			nextSearch: search,
+			animeId
+		});
+	};
+
+	const loadInitial = () => {
+		if (!query.search.trim() && !query.id) return;
+
+		void load({
+			nextSearch: query.search,
+			animeId: query.id,
+			replaceState: true
+		});
+	};
+
+	return {
+		get search() {
+			return search;
+		},
+
+		set search(value: string) {
+			search = value;
+		},
+
+		get selectedId() {
+			return selectedId;
+		},
+
+		get loading() {
+			return loading;
+		},
+
+		get error() {
+			return error;
+		},
+
+		get data() {
+			return data;
+		},
+
+		submit,
+		selectAnime,
+		loadInitial
 	};
 };

@@ -3,7 +3,7 @@
 
 	import Input from '$lib/components/ui/Input.svelte';
 
-	type ActiveTab = 'list' | 'rankings' | 'stats';
+	type ActiveTab = 'list' | 'rankings' | 'stats' | 'franchise';
 
 	type Props = {
 		activeTab: ActiveTab;
@@ -28,7 +28,8 @@
 	}> = [
 		{ value: 'list', label: 'list', href: '/list' },
 		{ value: 'rankings', label: 'rankings', href: '/rankings' },
-		{ value: 'stats', label: 'stats', href: '/stats' }
+		{ value: 'stats', label: 'stats', href: '/stats' },
+		{ value: 'franchise', label: 'franchise', href: '/franchise' }
 	];
 
 	const handleSubmit = () => {

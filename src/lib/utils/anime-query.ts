@@ -39,12 +39,27 @@ export type AnimeStatsQueryState = {
 	username: string;
 };
 
+export type AnimeFranchiseQueryState = {
+	search: string;
+	id: number | null;
+};
+
 const getTextParam = (url: URL, key: string) => {
 	return url.searchParams.get(key)?.trim() ?? '';
 };
 
 const getRawParam = (url: URL, key: string) => {
 	return url.searchParams.get(key);
+};
+
+const getNumberParam = (url: URL, key: string) => {
+	const value = Number(url.searchParams.get(key));
+
+	if (!Number.isFinite(value)) return null;
+
+	const normalizedValue = Math.trunc(value);
+
+	return normalizedValue > 0 ? normalizedValue : null;
 };
 
 const setOptionalParam = (
@@ -123,6 +138,13 @@ export const parseAnimeStatsQuery = (url: URL): AnimeStatsQueryState => {
 	};
 };
 
+export const parseAnimeFranchiseQuery = (url: URL): AnimeFranchiseQueryState => {
+	return {
+		search: getTextParam(url, 'q'),
+		id: getNumberParam(url, 'id')
+	};
+};
+
 export const buildAnimeListHref = ({
 																		 username,
 																		 search,
@@ -173,4 +195,16 @@ export const buildAnimeStatsHref = ({ username }: AnimeStatsQueryState) => {
 	setOptionalParam(params, 'username', username);
 
 	return buildHref('/stats', params);
+};
+
+export const buildAnimeFranchiseHref = ({ search, id }: AnimeFranchiseQueryState) => {
+	const params = new URLSearchParams();
+
+	setOptionalParam(params, 'q', search);
+
+	if (id) {
+		params.set('id', String(id));
+	}
+
+	return buildHref('/franchise', params);
 };
