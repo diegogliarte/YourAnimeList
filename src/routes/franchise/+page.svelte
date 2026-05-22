@@ -125,10 +125,33 @@
 	});
 
 	const franchiseAnimeIds = $derived(new Set(mergedFranchiseAnimes.map((anime) => anime.id)));
+
 	const franchiseCount = $derived(mergedFranchiseAnimes.length);
 
-	const watchedCount = $derived(
-		mergedFranchiseAnimes.filter((anime) => getUserAnime(anime)?.status === 'completed').length
+	const watchedEntryCount = $derived(
+		mergedFranchiseAnimes.filter((anime) => {
+			const userAnime = getUserAnime(anime);
+
+			return Boolean(
+				userAnime && (userAnime.status === 'completed' || (userAnime.episodesWatched ?? 0) > 0)
+			);
+		}).length
+	);
+
+	const totalEpisodeCount = $derived(
+		mergedFranchiseAnimes.reduce((sum, anime) => sum + (anime.totalEpisodes ?? 0), 0)
+	);
+
+	const watchedEpisodeCount = $derived(
+		mergedFranchiseAnimes.reduce((sum, anime) => {
+			const userAnime = getUserAnime(anime);
+			const watched = userAnime?.episodesWatched ?? 0;
+			const total = anime.totalEpisodes ?? userAnime?.totalEpisodes ?? 0;
+
+			if (total <= 0) return sum + watched;
+
+			return sum + Math.min(watched, total);
+		}, 0)
 	);
 
 	const totalRuntimeSeconds = $derived(
@@ -144,11 +167,28 @@
 		mergedFranchiseAnimes.reduce((sum, anime) => {
 			const userAnime = getUserAnime(anime);
 			const watchedEpisodes = userAnime?.episodesWatched ?? 0;
+			const totalEpisodes = anime.totalEpisodes ?? userAnime?.totalEpisodes ?? 0;
 			const duration = anime.averageEpisodeDuration ?? 0;
 
-			return sum + watchedEpisodes * duration;
+			if (totalEpisodes <= 0) return sum + watchedEpisodes * duration;
+
+			return sum + Math.min(watchedEpisodes, totalEpisodes) * duration;
 		}, 0)
 	);
+
+	const averageEpisodeDurationSeconds = $derived.by(() => {
+		const entriesWithDuration = mergedFranchiseAnimes.filter((anime) => {
+			return anime.averageEpisodeDuration && anime.averageEpisodeDuration > 0;
+		});
+
+		if (entriesWithDuration.length === 0) return null;
+
+		const total = entriesWithDuration.reduce((sum, anime) => {
+			return sum + (anime.averageEpisodeDuration ?? 0);
+		}, 0);
+
+		return total / entriesWithDuration.length;
+	});
 
 	const setSourceStreaming = (sourceId: number, active: boolean) => {
 		const next = new Set(streamingSourceIds);
@@ -302,6 +342,10 @@
 		return `${Math.round(minutes)}m`;
 	};
 
+	const formatCount = (value: number) => {
+		return new Intl.NumberFormat('en-US').format(value);
+	};
+
 	const formatMediaType = (mediaType: string | null) => {
 		return mediaType?.replaceAll('_', ' ') ?? 'unknown';
 	};
@@ -320,9 +364,9 @@
 		const total = anime.totalEpisodes ?? userAnime?.totalEpisodes ?? 0;
 
 		if (!userAnime) return null;
-		if (total <= 0) return `${watched} watched`;
+		if (total <= 0) return `${formatCount(watched)} watched`;
 
-		return `${watched}/${total} watched`;
+		return `${formatCount(Math.min(watched, total))}/${formatCount(total)} watched`;
 	};
 
 	const formatEpisodeDuration = (seconds: number | null) => {
@@ -344,9 +388,18 @@
 		return date?.trim() || null;
 	};
 
-	const formatReleaseRange = (anime: Anime) => {
+	const getVisibleEndDate = (anime: Anime) => {
 		const startDate = formatDate(anime.startDate);
 		const endDate = formatDate(anime.endDate);
+
+		if (!endDate || endDate === startDate) return null;
+
+		return endDate;
+	};
+
+	const formatReleaseRange = (anime: Anime) => {
+		const startDate = formatDate(anime.startDate);
+		const endDate = getVisibleEndDate(anime);
 
 		if (startDate && endDate) return `${startDate} → ${endDate}`;
 		if (startDate) return startDate;
@@ -566,27 +619,41 @@
 	{:else}
 		<ResultsPanel>
 			<div class="border-b border-white/10 bg-background px-3 py-2">
-				<p class="truncate text-sm text-neutral-300">
-					<span class="font-medium text-white">{franchiseCount}</span>
-					<span class="ml-1 text-neutral-500">entries</span>
+				<div class="grid gap-2 text-xs text-neutral-500 sm:grid-cols-2 lg:grid-cols-4">
+					<div class="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5">
+						<p class="text-[10px] uppercase tracking-wide text-neutral-600">entries</p>
+						<p class="mt-0.5 font-mono text-sm text-white">
+							{formatCount(watchedEntryCount)} / {formatCount(franchiseCount)}
+						</p>
+					</div>
 
-					{#if username.trim()}
-						<span class="ml-3 font-medium text-white">{watchedCount}</span>
-						<span class="ml-1 text-neutral-500">completed by {username.trim()}</span>
-					{/if}
+					<div class="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5">
+						<p class="text-[10px] uppercase tracking-wide text-neutral-600">episodes</p>
+						<p class="mt-0.5 font-mono text-sm text-white">
+							{formatCount(watchedEpisodeCount)} / {formatCount(totalEpisodeCount)}
+						</p>
+					</div>
 
-					{#if totalRuntimeSeconds > 0}
-						<span class="ml-3 text-neutral-500">total {formatDuration(totalRuntimeSeconds)}</span>
-					{/if}
+					<div class="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5">
+						<p class="text-[10px] uppercase tracking-wide text-neutral-600">time</p>
+						<p class="mt-0.5 font-mono text-sm text-white">
+							{formatDuration(watchedRuntimeSeconds)} / {formatDuration(totalRuntimeSeconds)}
+						</p>
+					</div>
 
-					{#if watchedRuntimeSeconds > 0}
-						<span class="ml-3 text-neutral-500">watched {formatDuration(watchedRuntimeSeconds)}</span>
-					{/if}
+					<div class="rounded-lg border border-white/10 bg-black/20 px-2 py-1.5">
+						<p class="text-[10px] uppercase tracking-wide text-neutral-600">avg ep</p>
+						<p class="mt-0.5 font-mono text-sm text-white">
+							{formatDuration(averageEpisodeDurationSeconds)}
+						</p>
+					</div>
+				</div>
 
-					{#if streaming}
-						<span class="ml-3 text-accent">streaming…</span>
-					{/if}
-				</p>
+				{#if streaming}
+					<p class="mt-2 truncate text-xs text-accent">streaming franchise entries…</p>
+				{:else if username.trim()}
+					<p class="mt-2 truncate text-xs text-neutral-500">user: {username.trim()}</p>
+				{/if}
 			</div>
 
 			<div class="space-y-3 p-2 sm:p-3">
@@ -666,6 +733,7 @@
 						<div class="divide-y divide-white/10">
 							{#each searchResults as anime (anime.id)}
 								{@const alreadyInFranchise = franchiseAnimeIds.has(anime.id)}
+
 								<button
 									type="button"
 									class={[
@@ -705,12 +773,13 @@
 							{#each mergedFranchiseAnimes as anime, index (anime.id)}
 								{@const userAnime = getUserAnime(anime)}
 								{@const watchedLabel = formatWatchedEpisodes(anime)}
+								{@const visibleEndDate = getVisibleEndDate(anime)}
 
 								<a
 									href={anime.href}
 									target="_blank"
 									rel="noreferrer"
-									class="grid gap-3 px-3 py-2 transition hover:bg-white/[0.03] sm:grid-cols-[36px_56px_170px_1fr_auto]"
+									class="grid grid-cols-[30px_56px_1fr] gap-3 px-3 py-2 transition hover:bg-white/[0.03] sm:grid-cols-[36px_56px_170px_1fr_auto]"
 								>
 									<div class="pt-2 text-right font-mono text-[11px] text-neutral-600">
 										{String(index + 1).padStart(2, '0')}
@@ -723,17 +792,31 @@
 									{/if}
 
 									<div class="hidden pt-1 sm:block">
-										<p class="font-mono flex flex-col text-xs text-accent">
-											<span>{anime.startDate ?? 'unknown start date'}</span>
-											<span>{anime.endDate ?? 'unknown end date'}</span>
+										<p class="flex flex-col font-mono text-xs text-accent">
+											<span>{anime.startDate ?? 'unknown start'}</span>
+											{#if visibleEndDate}
+												<span>{visibleEndDate}</span>
+											{/if}
 										</p>
+
 										<p class="mt-1 truncate text-[11px] text-neutral-500">
 											{formatMediaType(anime.mediaType)}
 										</p>
 									</div>
 
 									<div class="min-w-0 pt-1">
-										<h3 class="min-w-0 truncate text-sm font-medium text-white">{anime.title}</h3>
+										<div class="flex min-w-0 items-start justify-between gap-2">
+											<h3 class="min-w-0 truncate text-sm font-medium text-white">{anime.title}</h3>
+
+											<p
+												class={[
+													'shrink-0 rounded border px-2 py-0.5 text-[10px] sm:hidden',
+													getStatusClass(anime)
+												]}
+											>
+												{getStatusLabel(anime)}
+											</p>
+										</div>
 
 										<p class="mt-1 truncate text-xs text-neutral-500 sm:hidden">
 											{formatReleaseRange(anime)} · {formatMediaType(anime.mediaType)}
