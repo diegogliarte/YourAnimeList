@@ -30,39 +30,44 @@
 	}
 </script>
 
-<header class="border-b border-border bg-background/30">
+<header class="border-b border-border bg-background/80 backdrop-blur">
 	<nav
 		class="
-			mx-auto grid max-w-7xl grid-cols-[auto_1fr] items-center gap-3 px-4 py-3
-			lg:grid-cols-[auto_1fr_auto]
+			mx-auto grid max-w-7xl grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 px-3 py-2
+			lg:grid-cols-[auto_1fr_auto] lg:px-4
 		"
 	>
-		<a href="/list" class="shrink-0 text-sm font-semibold text-text"> YourAnimeList </a>
+		<a href="/list" class="shrink-0 text-sm font-semibold leading-none text-text">
+			YourAnimeList
+		</a>
 
 		<form
-			class="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-2 lg:col-start-3"
+			class="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-1.5 lg:col-start-3"
 			onsubmit={(event) => {
-				console.log('submitting form');
 				event.preventDefault();
 				loadUserList();
-				console.log('animeData after loadUserList call', animeData);
 			}}
 		>
 			<TextInput
 				bind:value={animeData.username}
 				placeholder="MAL username"
-				class="w-32 sm:w-44"
+				class="h-8 w-28 px-2 py-1 text-xs sm:w-40"
 				disabled={animeData.userListLoading}
 			/>
 
-			<Button type="submit" variant="primary" class="w-18" disabled={animeData.userListLoading}>
+			<Button
+				type="submit"
+				variant="primary"
+				class="h-8 w-16 px-2 py-1 text-xs"
+				disabled={animeData.userListLoading}
+			>
 				{submitLabel}
 			</Button>
 		</form>
 
 		<div
 			class="
-				col-span-2 row-start-2 flex justify-center gap-2 overflow-x-auto pb-1
+				col-span-2 row-start-2 flex justify-center gap-1.5 overflow-x-auto pb-0.5
 				lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:overflow-visible lg:pb-0
 			"
 		>
@@ -70,7 +75,7 @@
 				<a
 					href={tab.href}
 					class={`
-						shrink-0 rounded-md px-3 py-1.5 text-sm transition
+						shrink-0 rounded-md px-2 py-1 text-xs leading-none transition
 						${
 							isActive(tab.href)
 								? 'bg-primary text-background'
@@ -85,7 +90,7 @@
 	</nav>
 
 	{#if animeData.userListError}
-		<div class="mx-auto max-w-7xl px-4 pb-3 text-xs text-primary">
+		<div class="mx-auto max-w-7xl px-3 pb-2 text-xs text-primary lg:px-4">
 			{animeData.userListError}
 		</div>
 	{/if}

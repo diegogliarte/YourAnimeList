@@ -35,7 +35,12 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<Navbar />
-<main class="mx-auto max-w-6xl px-4 py-8">
-	{@render children()}
-</main>
+<div class="flex h-dvh flex-col overflow-hidden">
+	<Navbar />
+
+	<main class="min-h-0 flex-1 overflow-y-auto">
+		<div class="mx-auto max-w-6xl px-4 py-8">
+			{@render children()}
+		</div>
+	</main>
+</div>
