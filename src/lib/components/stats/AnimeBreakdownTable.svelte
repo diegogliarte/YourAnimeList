@@ -70,7 +70,7 @@
 			align: 'center',
 			width: '5rem',
 			compare: (a, b) => a.avgRuntimeSeconds - b.avgRuntimeSeconds
-		},
+		}
 	];
 
 	const sortedRows = $derived.by(() => {
@@ -175,90 +175,92 @@
 			</colgroup>
 
 			<thead class="bg-surface-soft text-xs text-text-muted">
-			<tr>
-				{#each columns as column (column.value)}
-					<th class={`whitespace-nowrap px-2 py-1 font-medium ${alignClass(column.align)}`}>
-						{#if column.compare}
-							<button
-								type="button"
-								class="inline-flex cursor-pointer items-center gap-1 text-inherit transition hover:text-text"
-								onclick={() => toggleSort(column)}
-							>
-								<span>{column.label}</span>
+				<tr>
+					{#each columns as column (column.value)}
+						<th class={`px-2 py-1 font-medium whitespace-nowrap ${alignClass(column.align)}`}>
+							{#if column.compare}
+								<button
+									type="button"
+									class="inline-flex cursor-pointer items-center gap-1 text-inherit transition hover:text-text"
+									onclick={() => toggleSort(column)}
+								>
+									<span>{column.label}</span>
 
-								<span
-									class={`
+									<span
+										class={`
 											inline-block w-3 text-right text-primary
 											${selectedSort === column.value ? 'opacity-100' : 'opacity-0'}
 										`}
-								>
+									>
 										{getSortIcon(column)}
 									</span>
-							</button>
-						{:else}
-							{column.label}
-						{/if}
-					</th>
-				{/each}
-			</tr>
+								</button>
+							{:else}
+								{column.label}
+							{/if}
+						</th>
+					{/each}
+				</tr>
 			</thead>
 
 			<tbody class="divide-y divide-border">
-			{#if visibleRows.length > 0}
-				{#each visibleRows as row (row.name)}
-					<tr
-						class="cursor-pointer transition hover:bg-surface-soft"
-						onclick={() => toggleSelected(row.name)}
-					>
-						<td class="max-w-56 truncate px-2 py-1 text-text">
-							{row.name}
-						</td>
+				{#if visibleRows.length > 0}
+					{#each visibleRows as row (row.name)}
+						<tr
+							class="cursor-pointer transition hover:bg-surface-soft"
+							onclick={() => toggleSelected(row.name)}
+						>
+							<td class="max-w-56 truncate px-2 py-1 text-text">
+								{row.name}
+							</td>
 
-						<td class="px-2 py-1 text-center text-text-soft">
-							{row.count}
-						</td>
+							<td class="px-2 py-1 text-center text-text-soft">
+								{row.count}
+							</td>
 
-						<td class="px-2 py-1 text-center text-primary">
-							{formatScore(row.avgScore)}
-						</td>
+							<td class="px-2 py-1 text-center text-primary">
+								{formatScore(row.avgScore)}
+							</td>
 
-						<td class="px-2 py-1 text-center text-text-soft">
-							{formatDuration(row.avgRuntimeSeconds * row.count)}
-						</td>
+							<td class="px-2 py-1 text-center text-text-soft">
+								{formatDuration(row.avgRuntimeSeconds * row.count)}
+							</td>
 
-						<td class="px-2 py-1 text-center text-text-soft">
-							{formatDuration(row.avgRuntimeSeconds)}
-						</td>
-					</tr>
-
-					{#if selectedName === row.name}
-						<tr>
-							<td colspan={columns.length} class="bg-background px-2 py-1">
-								<div class="max-h-56 w-full max-w-[calc(100vw-3rem)] overflow-x-hidden overflow-y-auto pr-1">
-									<div class="grid gap-1">
-										{#each row.items as entry (entry.node.id)}
-											<a
-												href={getAnimeUrl(entry.node.id)}
-												target="_blank"
-												rel="noreferrer"
-												class="block min-w-0 truncate rounded-md px-2 py-1 text-sm text-text-soft hover:bg-surface-soft hover:text-primary"
-											>
-												{entry.node.title}
-											</a>
-										{/each}
-									</div>
-								</div>
+							<td class="px-2 py-1 text-center text-text-soft">
+								{formatDuration(row.avgRuntimeSeconds)}
 							</td>
 						</tr>
-					{/if}
-				{/each}
-			{:else}
-				<tr>
-					<td colspan={columns.length} class="px-2 py-8 text-center text-text-muted">
-						No results.
-					</td>
-				</tr>
-			{/if}
+
+						{#if selectedName === row.name}
+							<tr>
+								<td colspan={columns.length} class="bg-background px-2 py-1">
+									<div
+										class="max-h-56 w-full max-w-[calc(100vw-3rem)] overflow-x-hidden overflow-y-auto pr-1"
+									>
+										<div class="grid gap-1">
+											{#each row.items as entry (entry.node.id)}
+												<a
+													href={getAnimeUrl(entry.node.id)}
+													target="_blank"
+													rel="noreferrer"
+													class="block min-w-0 truncate rounded-md px-2 py-1 text-sm text-text-soft hover:bg-surface-soft hover:text-primary"
+												>
+													{entry.node.title}
+												</a>
+											{/each}
+										</div>
+									</div>
+								</td>
+							</tr>
+						{/if}
+					{/each}
+				{:else}
+					<tr>
+						<td colspan={columns.length} class="px-2 py-8 text-center text-text-muted">
+							No results.
+						</td>
+					</tr>
+				{/if}
 			</tbody>
 		</table>
 	</div>

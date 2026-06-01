@@ -18,7 +18,11 @@
 	);
 
 	const submitLabel = $derived(
-		animeData.userListLoading ? 'Loading...' : isSameLoadedUser && animeData.hasUserList ? 'Reload' : 'Load'
+		animeData.userListLoading
+			? 'Loading...'
+			: isSameLoadedUser && animeData.hasUserList
+				? 'Reload'
+				: 'Load'
 	);
 
 	async function loadUserList() {
@@ -33,9 +37,7 @@
 			lg:grid-cols-[auto_1fr_auto]
 		"
 	>
-		<a href="/list" class="shrink-0 text-sm font-semibold text-text">
-			YourAnimeList
-		</a>
+		<a href="/list" class="shrink-0 text-sm font-semibold text-text"> YourAnimeList </a>
 
 		<form
 			class="col-start-2 row-start-1 flex min-w-0 items-center justify-end gap-2 lg:col-start-3"

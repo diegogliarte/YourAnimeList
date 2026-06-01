@@ -25,6 +25,8 @@
 	};
 </script>
 
-<span class={`inline-flex rounded-sm border px-1 py-0.5 text-xs ${status ? classes[status] : ''} ${className}`}>
+<span
+	class={`inline-flex rounded-sm border px-1 py-0.5 text-xs ${status ? classes[status] : ''} ${className}`}
+>
 	{status ? labels[status] : 'Unknown'}
 </span>

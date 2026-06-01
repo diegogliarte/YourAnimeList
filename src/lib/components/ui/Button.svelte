@@ -18,7 +18,8 @@
 		...rest
 	}: Props = $props();
 
-	const base = 'cursor-pointer rounded-md border px-2 py-1 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50';
+	const base =
+		'cursor-pointer rounded-md border px-2 py-1 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50';
 
 	const variants: Record<Variant, string> = {
 		default: 'border-border bg-surface text-text hover:bg-surface-soft',
@@ -26,11 +27,6 @@
 	};
 </script>
 
-<button
-	{type}
-	{disabled}
-	class={`${base} ${variants[variant]} ${className}`}
-	{...rest}
->
+<button {type} {disabled} class={`${base} ${variants[variant]} ${className}`} {...rest}>
 	{@render children?.()}
 </button>

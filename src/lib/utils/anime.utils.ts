@@ -19,14 +19,10 @@ export const INCLUDED_FRANCHISE_RELATIONS = new Set([
 	'side_story',
 	'summary',
 	'full_story',
-	'parent_story',
+	'parent_story'
 ]);
 
-export const EXCLUDED_FRANCHISE_RELATIONS = new Set([
-	'alternative_setting',
-	'character',
-	'other'
-]);
+export const EXCLUDED_FRANCHISE_RELATIONS = new Set(['alternative_setting', 'character', 'other']);
 
 export const SHOWCASE_MEDIA_TYPES = new Set(['tv', 'movie', 'ova']);
 

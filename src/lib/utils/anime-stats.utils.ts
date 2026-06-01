@@ -1,11 +1,6 @@
 import type { UserAnimeListEdge } from '$lib/types/anime';
 import { formatLabel } from './format.utils';
-import {
-	getDuration,
-	getUserScore,
-	getWatchedEpisodes,
-	getYear
-} from './anime.utils';
+import { getDuration, getUserScore, getWatchedEpisodes, getYear } from './anime.utils';
 import { average, sum } from './math.utils';
 
 export type AnimeGroupDatum = {

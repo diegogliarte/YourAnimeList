@@ -121,9 +121,7 @@ class AnimeDataStore {
 		this.userListError = null;
 
 		try {
-			const response = await fetch(
-				`/api/mal/users/${encodeURIComponent(cleanUsername)}/animelist`
-			);
+			const response = await fetch(`/api/mal/users/${encodeURIComponent(cleanUsername)}/animelist`);
 
 			if (!response.ok) {
 				const message = await response.text();
@@ -139,8 +137,7 @@ class AnimeDataStore {
 		} catch (error) {
 			this.loadedUsername = '';
 			this.userList = [];
-			this.userListError =
-				error instanceof Error ? error.message : 'Failed to load anime list';
+			this.userListError = error instanceof Error ? error.message : 'Failed to load anime list';
 
 			this.persist();
 		} finally {
@@ -148,12 +145,7 @@ class AnimeDataStore {
 		}
 	}
 
-	async loadAnimeRanking(
-		type = this.rankingType,
-		offset = 0,
-		append = false,
-		force = false
-	) {
+	async loadAnimeRanking(type = this.rankingType, offset = 0, append = false, force = false) {
 		this.rankingType = type;
 
 		const currentData = this.rankingDataByType[type] ?? [];
@@ -210,8 +202,7 @@ class AnimeDataStore {
 				};
 			}
 
-			this.rankingError =
-				error instanceof Error ? error.message : 'Failed to load anime ranking';
+			this.rankingError = error instanceof Error ? error.message : 'Failed to load anime ranking';
 		} finally {
 			if (currentRequestId === this.rankingRequestId) {
 				this.rankingLoading = false;
@@ -269,8 +260,7 @@ class AnimeDataStore {
 			if (currentRequestId !== this.franchiseSearchRequestId) return;
 
 			this.franchiseSearchResults = [];
-			this.franchiseSearchError =
-				error instanceof Error ? error.message : 'Failed to search anime';
+			this.franchiseSearchError = error instanceof Error ? error.message : 'Failed to search anime';
 		} finally {
 			if (currentRequestId === this.franchiseSearchRequestId) {
 				this.franchiseSearchLoading = false;
@@ -393,7 +383,7 @@ class AnimeDataStore {
 				this.franchiseQueue.length > 0 &&
 				!this.franchiseStopRequested &&
 				runId === this.franchiseRunId
-				) {
+			) {
 				const animeId = this.franchiseQueue[0];
 
 				this.franchiseQueue = this.franchiseQueue.slice(1);
@@ -402,8 +392,7 @@ class AnimeDataStore {
 			}
 		} catch (error) {
 			if (runId === this.franchiseRunId) {
-				this.franchiseError =
-					error instanceof Error ? error.message : 'Failed to crawl franchise';
+				this.franchiseError = error instanceof Error ? error.message : 'Failed to crawl franchise';
 			}
 		} finally {
 			if (runId === this.franchiseRunId) {

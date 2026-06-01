@@ -110,10 +110,7 @@
 <div class={`overflow-hidden rounded-md border border-border bg-surface ${className}`}>
 	{#if filterText}
 		<div class="border-b border-border bg-surface p-2">
-			<TextInput
-				bind:value={query}
-				placeholder={filterPlaceholder}
-			/>
+			<TextInput bind:value={query} placeholder={filterPlaceholder} />
 		</div>
 	{/if}
 
@@ -126,51 +123,49 @@
 			</colgroup>
 
 			<thead class="bg-surface-soft text-xs text-text-muted">
-			<tr>
-				{#each columns as column (column.value)}
-					<th
-						class={`whitespace-nowrap px-3 py-2 font-medium ${alignClass(column.align)}`}
-					>
-						{#if column.compare}
-							<button
-								type="button"
-								class="
+				<tr>
+					{#each columns as column (column.value)}
+						<th class={`px-3 py-2 font-medium whitespace-nowrap ${alignClass(column.align)}`}>
+							{#if column.compare}
+								<button
+									type="button"
+									class="
 										inline-flex cursor-pointer items-center gap-1 text-inherit transition
 										hover:text-text
 									"
-								onclick={() => toggleSort(column)}
-							>
-								<span>{column.label}</span>
+									onclick={() => toggleSort(column)}
+								>
+									<span>{column.label}</span>
 
-								<span
-									class={`
+									<span
+										class={`
 											inline-block w-3 text-right text-primary
 											${selectedSort === column.value ? 'opacity-100' : 'opacity-0'}
 										`}
-								>
+									>
 										{getSortIcon(column)}
 									</span>
-							</button>
-						{:else}
-							{column.label}
-						{/if}
-					</th>
-				{/each}
-			</tr>
+								</button>
+							{:else}
+								{column.label}
+							{/if}
+						</th>
+					{/each}
+				</tr>
 			</thead>
 
 			<tbody class="divide-y divide-border">
-			{#if sortedItems.length > 0}
-				{#each sortedItems as item, index}
-					{@render children(item, index)}
-				{/each}
-			{:else}
-				<tr>
-					<td colspan={columns.length} class="px-3 py-8 text-center text-text-muted">
-						No results.
-					</td>
-				</tr>
-			{/if}
+				{#if sortedItems.length > 0}
+					{#each sortedItems as item, index}
+						{@render children(item, index)}
+					{/each}
+				{:else}
+					<tr>
+						<td colspan={columns.length} class="px-3 py-8 text-center text-text-muted">
+							No results.
+						</td>
+					</tr>
+				{/if}
 			</tbody>
 		</table>
 	</div>

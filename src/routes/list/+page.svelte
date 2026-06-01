@@ -189,7 +189,7 @@
 						{entry.node.num_episodes || '?'}
 					</td>
 
-					<td class="whitespace-nowrap px-3 py-2 text-center text-text-soft">
+					<td class="px-3 py-2 text-center whitespace-nowrap text-text-soft">
 						{formatSeason(entry)}
 					</td>
 				</tr>

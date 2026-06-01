@@ -84,7 +84,9 @@
 	const franchiseStats = $derived.by<Stat[]>(() => {
 		const entries = animeData.franchiseAnimeList;
 
-		const completedCount = entries.filter((anime) => getUserStatus(anime.id) === 'completed').length;
+		const completedCount = entries.filter(
+			(anime) => getUserStatus(anime.id) === 'completed'
+		).length;
 
 		const knownEpisodeEntries = entries.filter((anime) => (anime.num_episodes ?? 0) > 0);
 		const totalEpisodes = knownEpisodeEntries.reduce(
@@ -295,9 +297,7 @@
 					</Button>
 
 					{#if animeData.hasFranchise}
-						<Button type="button" onclick={() => (showSearch = false)}>
-							Cancel
-						</Button>
+						<Button type="button" onclick={() => (showSearch = false)}>Cancel</Button>
 					{/if}
 				</form>
 			{:else}
@@ -306,14 +306,10 @@
 						Add anime
 					</Button>
 
-					<Button type="button" onclick={startNewSearch}>
-						New franchise
-					</Button>
+					<Button type="button" onclick={startNewSearch}>New franchise</Button>
 
 					{#if animeData.franchiseCrawling}
-						<Button type="button" onclick={() => animeData.stopFranchiseCrawl()}>
-							Stop crawl
-						</Button>
+						<Button type="button" onclick={() => animeData.stopFranchiseCrawl()}>Stop crawl</Button>
 					{/if}
 				</div>
 			{/if}
@@ -328,11 +324,13 @@
 
 			{#if animeData.franchiseCrawling}
 				<p class="text-xs text-text-muted">
-					Crawling franchise... visited {animeData.franchiseVisitedCount}, queued {animeData.franchiseQueue.length}.
+					Crawling franchise... visited {animeData.franchiseVisitedCount}, queued {animeData
+						.franchiseQueue.length}.
 				</p>
 			{:else if animeData.hasFranchise}
 				<p class="text-xs text-text-muted">
-					Visited {animeData.franchiseVisitedCount}. Found {animeData.franchiseAnimeList.length} accepted anime.
+					Visited {animeData.franchiseVisitedCount}. Found {animeData.franchiseAnimeList.length} accepted
+					anime.
 				</p>
 			{/if}
 		</div>

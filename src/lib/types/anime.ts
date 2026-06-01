@@ -1,13 +1,6 @@
 export type AnimeStatus = 'finished_airing' | 'currently_airing' | 'not_yet_aired';
 
-export type AnimeMediaType =
-	| 'unknown'
-	| 'tv'
-	| 'ova'
-	| 'movie'
-	| 'special'
-	| 'ona'
-	| 'music';
+export type AnimeMediaType = 'unknown' | 'tv' | 'ova' | 'movie' | 'special' | 'ona' | 'music';
 
 export type AnimeListStatusName =
 	| 'watching'

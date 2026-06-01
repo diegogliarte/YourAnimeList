@@ -71,11 +71,7 @@
 					<span
 						class={`
 							block h-full rounded-full transition-all
-							${
-								selectedKey === item.key
-									? 'bg-accent'
-									: 'bg-primary/70 group-hover:bg-primary'
-							}
+							${selectedKey === item.key ? 'bg-accent' : 'bg-primary/70 group-hover:bg-primary'}
 						`}
 						style:width={width(item.value)}
 					></span>

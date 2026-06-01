@@ -3,11 +3,7 @@
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import Table, { type TableColumn } from '$lib/components/ui/Table.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
-	import type {
-		AnimeListStatusName,
-		AnimeRankingEdge,
-		AnimeRankingType
-	} from '$lib/types/anime';
+	import type { AnimeListStatusName, AnimeRankingEdge, AnimeRankingType } from '$lib/types/anime';
 	import {
 		formatSeason,
 		getAnimeUrl,
@@ -247,7 +243,10 @@
 				</div>
 
 				<div class="flex items-center gap-2">
-					<Button onclick={() => animeData.refreshAnimeRanking()} disabled={animeData.rankingLoading}>
+					<Button
+						onclick={() => animeData.refreshAnimeRanking()}
+						disabled={animeData.rankingLoading}
+					>
 						Refresh
 					</Button>
 
@@ -327,7 +326,7 @@
 						{entry.node.num_episodes || '?'}
 					</td>
 
-					<td class="whitespace-nowrap px-3 py-2 text-center text-text-soft">
+					<td class="px-3 py-2 text-center whitespace-nowrap text-text-soft">
 						{formatSeason(entry)}
 					</td>
 				</tr>
@@ -339,9 +338,7 @@
 				<p class="text-sm text-text-muted">Loading more...</p>
 			</Panel>
 		{:else if animeData.rankingNextOffset === null && animeData.rankingData.length > 0}
-			<p class="py-3 text-center text-xs text-text-muted">
-				End of ranking.
-			</p>
+			<p class="py-3 text-center text-xs text-text-muted">End of ranking.</p>
 		{/if}
 	{/if}
 </div>

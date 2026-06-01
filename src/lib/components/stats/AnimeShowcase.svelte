@@ -78,18 +78,13 @@
 							you <span class="text-primary">{formatUserScore(item)}</span>
 						</p>
 
-							<p
-								class={`text-right ${
-									(item.diff ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
-								}`}
-							>
-								{formatSigned(item.diff ?? 0)}
-							</p>
+						<p class={`text-right ${(item.diff ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+							{formatSigned(item.diff ?? 0)}
+						</p>
 						{#if metric === 'popularity'}
-							<p class="text-text-muted whitespace-nowrap">
+							<p class="whitespace-nowrap text-text-muted">
 								pop <span class="text-text">#{formatNumber(item.popularity ?? 0)}</span>
 							</p>
-
 						{:else}
 							<p class="text-text-muted">
 								MAL <span class="text-text-soft">{formatDecimal(item.malScore ?? 0, 2)}</span>

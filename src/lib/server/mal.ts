@@ -227,7 +227,12 @@ export async function fetchAnimeRanking(
 	};
 }
 
-export async function fetchAnimeSearch(fetcher: Fetch, query: string, limit: number, offset: number) {
+export async function fetchAnimeSearch(
+	fetcher: Fetch,
+	query: string,
+	limit: number,
+	offset: number
+) {
 	const body = await fetchMalJson<MalPagedResponse<AnimeSearchEdge>>(
 		fetcher,
 		'/anime',

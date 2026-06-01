@@ -32,9 +32,7 @@ export function formatSigned(value: number) {
 }
 
 export function formatLabel(value: string) {
-	return value
-		.replaceAll('_', ' ')
-		.replace(/\b\w/g, (letter) => letter.toUpperCase());
+	return value.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export function capitalize(value: string) {

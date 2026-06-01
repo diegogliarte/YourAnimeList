@@ -1,5 +1,7 @@
 <script lang="ts">
-	import AnimeBarChart, { type AnimeBarChartDatum } from '$lib/components/stats/AnimeBarChart.svelte';
+	import AnimeBarChart, {
+		type AnimeBarChartDatum
+	} from '$lib/components/stats/AnimeBarChart.svelte';
 	import AnimeBreakdownTable, {
 		type AnimeBreakdownRow
 	} from '$lib/components/stats/AnimeBreakdownTable.svelte';
@@ -39,7 +41,9 @@
 		formatSigned
 	} from '$lib/utils/format.utils';
 	import { average, standardDeviation, sum } from '$lib/utils/math.utils';
-	import AnimeShowcase, { type AnimeShowcaseItem } from '$lib/components/stats/AnimeShowcase.svelte';
+	import AnimeShowcase, {
+		type AnimeShowcaseItem
+	} from '$lib/components/stats/AnimeShowcase.svelte';
 
 	type Stat = {
 		label: string;
@@ -93,9 +97,7 @@
 	);
 
 	const watchedWithDuration = $derived(
-		animeData.userList.filter(
-			(entry) => getWatchedEpisodes(entry) > 0 && getDuration(entry) > 0
-		)
+		animeData.userList.filter((entry) => getWatchedEpisodes(entry) > 0 && getDuration(entry) > 0)
 	);
 
 	const rewatchEntries = $derived(
@@ -130,9 +132,7 @@
 		sum(animeData.userList, (entry) => entry.list_status?.num_times_rewatched ?? 0)
 	);
 
-	const averageScore = $derived(
-		average(ratedCompletedEntries.map((entry) => getUserScore(entry)))
-	);
+	const averageScore = $derived(average(ratedCompletedEntries.map((entry) => getUserScore(entry))));
 
 	const scoreSpread = $derived(
 		standardDeviation(ratedCompletedEntries.map((entry) => getUserScore(entry)))
@@ -401,7 +401,7 @@
 			align: 'right',
 			value: (row) => formatDuration(row.totalSeconds)
 		}
-	]
+	];
 
 	function isShowcaseMedia(entry: UserAnimeListEdge) {
 		return ['tv', 'movie', 'ova'].includes(entry.node.media_type ?? '');
@@ -530,17 +530,9 @@
 			</div>
 
 			<div class="grid gap-2 lg:grid-cols-2">
-				<AnimeBreakdownTable
-					title="Genre breakdown"
-					rows={genreBreakdown}
-					maxRows={10}
-				/>
+				<AnimeBreakdownTable title="Genre breakdown" rows={genreBreakdown} maxRows={10} />
 
-				<AnimeBreakdownTable
-					title="Studio breakdown"
-					rows={studioBreakdown}
-					maxRows={10}
-				/>
+				<AnimeBreakdownTable title="Studio breakdown" rows={studioBreakdown} maxRows={10} />
 			</div>
 
 			<div class="grid gap-2 lg:grid-cols-2">

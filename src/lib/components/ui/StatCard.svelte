@@ -12,7 +12,7 @@
 </script>
 
 <Panel class={`p-2! ${className}`}>
-	<p class="text-xs uppercase tracking-wide text-text-muted">{label}</p>
+	<p class="text-xs tracking-wide text-text-muted uppercase">{label}</p>
 	<p class="mt-1 text-xl font-semibold text-text">{value}</p>
 
 	{#if hint}
