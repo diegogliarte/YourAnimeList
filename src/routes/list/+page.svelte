@@ -1,7 +1,7 @@
 <script lang="ts">
-	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import Table, { type TableColumn } from '$lib/components/ui/Table.svelte';
+	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { UserAnimeListEdge } from '$lib/types/anime';
 	import {
@@ -95,7 +95,7 @@
 	<Panel title="Anime List">
 		<div class="flex flex-wrap items-center justify-between gap-3">
 			<div class="flex flex-wrap gap-2">
-				{#each STATUS_FILTERS as filter (filter)}
+				{#each STATUS_FILTERS as filter (filter.value)}
 					<button
 						type="button"
 						class={`
@@ -113,9 +113,7 @@
 				{/each}
 			</div>
 
-			<Button onclick={() => (showMalScore = !showMalScore)}>
-				{showMalScore ? 'Hide MAL score' : 'Show MAL score'}
-			</Button>
+			<Toggle bind:checked={showMalScore} label="MAL score" />
 		</div>
 	</Panel>
 
@@ -189,7 +187,7 @@
 						{entry.node.num_episodes || '?'}
 					</td>
 
-					<td class="px-3 py-2 text-center whitespace-nowrap text-text-soft">
+					<td class="whitespace-nowrap px-3 py-2 text-center text-text-soft">
 						{formatSeason(entry)}
 					</td>
 				</tr>

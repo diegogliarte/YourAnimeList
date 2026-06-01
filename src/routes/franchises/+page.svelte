@@ -5,6 +5,7 @@
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import Table, { type TableColumn } from '$lib/components/ui/Table.svelte';
 	import TextInput from '$lib/components/ui/TextInput.svelte';
+	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { AnimeDetails, AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
 	import {
@@ -27,47 +28,55 @@
 	};
 
 	let showSearch = $state(false);
+	let showMalScore = $state(true);
 
-	const columns: TableColumn<AnimeDetails>[] = [
-		{
-			label: '#',
-			value: 'index',
-			width: '3rem'
-		},
-		{
-			label: 'Anime',
-			value: 'title',
-			width: '26rem',
-			compare: (a, b) => a.title.localeCompare(b.title)
-		},
-		{
-			label: 'Score',
-			value: 'score',
-			align: 'center',
-			width: '4.5rem',
-			compare: (a, b) => getUserScore(a.id) - getUserScore(b.id)
-		},
-		{
-			label: 'Progress',
-			value: 'progress',
-			align: 'center',
-			width: '5.5rem'
-		},
-		{
-			label: 'Episodes',
-			value: 'episodes',
-			align: 'center',
-			width: '5rem',
-			compare: (a, b) => (a.num_episodes ?? 0) - (b.num_episodes ?? 0)
-		},
-		{
-			label: 'MAL',
-			value: 'mal',
-			align: 'center',
-			width: '4.5rem',
-			compare: (a, b) => (a.mean ?? 0) - (b.mean ?? 0)
+	const columns: TableColumn<AnimeDetails>[] = $derived.by(() => {
+		const baseColumns: TableColumn<AnimeDetails>[] = [
+			{
+				label: '#',
+				value: 'index',
+				width: '3rem'
+			},
+			{
+				label: 'Anime',
+				value: 'title',
+				width: '26rem',
+				compare: (a, b) => a.title.localeCompare(b.title)
+			},
+			{
+				label: 'Score',
+				value: 'score',
+				align: 'center',
+				width: '4.5rem',
+				compare: (a, b) => getUserScore(a.id) - getUserScore(b.id)
+			},
+			{
+				label: 'Progress',
+				value: 'progress',
+				align: 'center',
+				width: '5.5rem'
+			},
+			{
+				label: 'Episodes',
+				value: 'episodes',
+				align: 'center',
+				width: '5rem',
+				compare: (a, b) => (a.num_episodes ?? 0) - (b.num_episodes ?? 0)
+			}
+		];
+
+		if (showMalScore) {
+			baseColumns.push({
+				label: 'MAL',
+				value: 'mal',
+				align: 'center',
+				width: '4.5rem',
+				compare: (a, b) => (a.mean ?? 0) - (b.mean ?? 0)
+			});
 		}
-	];
+
+		return baseColumns;
+	});
 
 	const userEntryByAnimeId = $derived.by(() => {
 		const entries = new Map<number, UserAnimeListEdge>();
@@ -272,14 +281,14 @@
 
 <div class="grid gap-4">
 	<Panel title="Franchises">
-		<div class="grid gap-3">
+		<div class="flex flex-wrap items-center justify-between gap-2">
 			{#if shouldShowSearch}
 				<form
-					class="flex items-center gap-2"
+					class="flex min-w-0 flex-wrap items-center gap-2"
 					onsubmit={(event) => {
-						event.preventDefault();
-						submitSearch();
-					}}
+				event.preventDefault();
+				submitSearch();
+			}}
 				>
 					<TextInput
 						bind:value={animeData.franchiseQuery}
@@ -301,7 +310,7 @@
 					{/if}
 				</form>
 			{:else}
-				<div class="flex flex-wrap items-center gap-2">
+				<div class="flex min-w-0 flex-wrap items-center gap-2">
 					<Button type="button" variant="primary" onclick={() => (showSearch = true)}>
 						Add anime
 					</Button>
@@ -314,25 +323,7 @@
 				</div>
 			{/if}
 
-			{#if animeData.franchiseSearchError}
-				<p class="text-sm text-primary">{animeData.franchiseSearchError}</p>
-			{/if}
-
-			{#if animeData.franchiseError}
-				<p class="text-sm text-primary">{animeData.franchiseError}</p>
-			{/if}
-
-			{#if animeData.franchiseCrawling}
-				<p class="text-xs text-text-muted">
-					Crawling franchise... visited {animeData.franchiseVisitedCount}, queued {animeData
-						.franchiseQueue.length}.
-				</p>
-			{:else if animeData.hasFranchise}
-				<p class="text-xs text-text-muted">
-					Visited {animeData.franchiseVisitedCount}. Found {animeData.franchiseAnimeList.length} accepted
-					anime.
-				</p>
-			{/if}
+			<Toggle bind:checked={showMalScore} label="MAL score" class="ml-auto" />
 		</div>
 	</Panel>
 
@@ -493,9 +484,11 @@
 						{anime.num_episodes || '?'}
 					</td>
 
-					<td class="px-3 py-2 text-center text-text-soft">
-						{anime.mean ? formatDecimal(anime.mean, 2) : '-'}
-					</td>
+					{#if showMalScore}
+						<td class="px-3 py-2 text-center text-text-soft">
+							{anime.mean ? formatDecimal(anime.mean, 2) : '-'}
+						</td>
+					{/if}
 				</tr>
 			{/snippet}
 		</Table>

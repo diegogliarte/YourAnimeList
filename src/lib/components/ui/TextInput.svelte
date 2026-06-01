@@ -12,7 +12,7 @@
 	bind:value
 	{type}
 	class={`
-		w-full rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-text
+		rounded-md border border-border bg-surface px-3 py-1.5 text-sm text-text
 		transition outline-none
 		placeholder:text-text-muted
 		hover:border-primary/70 hover:bg-surface-soft
