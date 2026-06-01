@@ -166,7 +166,10 @@
 	}
 
 	function getAnimeSubtitle(entry: AnimeRankingEdge) {
-		const parts = [entry.node.media_type ?? 'unknown', entry.node.status ?? 'unknown'];
+		const parts: string[] = [
+			entry.node.media_type || 'unknown',
+			entry.node.status || 'unknown'
+		];
 
 		if (animeData.hasUserList) {
 			const userStatus = getUserStatusLabel(entry);
