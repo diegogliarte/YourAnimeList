@@ -12,6 +12,22 @@ export const STATUS_FILTERS: { label: string; value: StatusFilter }[] = [
 	{ label: 'Plan to Watch', value: 'plan_to_watch' }
 ];
 
+export const INCLUDED_FRANCHISE_RELATIONS = new Set([
+	'prequel',
+	'sequel',
+	'alternative_version',
+	'side_story',
+	'summary',
+	'full_story',
+	'parent_story',
+]);
+
+export const EXCLUDED_FRANCHISE_RELATIONS = new Set([
+	'alternative_setting',
+	'character',
+	'other'
+]);
+
 export const SHOWCASE_MEDIA_TYPES = new Set(['tv', 'movie', 'ova']);
 
 export function getAnimeUrl(id: number) {
@@ -65,6 +81,40 @@ export function getDuration(entry: AnimeEdge) {
 
 export function isShowcaseMedia(entry: AnimeEdge) {
 	return SHOWCASE_MEDIA_TYPES.has(entry.node.media_type ?? '');
+}
+
+export function compareAnimeRelease(a: AnimeEdge, b: AnimeEdge) {
+	const dateA = getSortableAnimeDate(a);
+	const dateB = getSortableAnimeDate(b);
+
+	const dateDiff = dateA.localeCompare(dateB);
+
+	if (dateDiff !== 0) return dateDiff;
+
+	return a.node.title.localeCompare(b.node.title);
+}
+
+export function getSortableAnimeDate(entry: AnimeEdge) {
+	if (entry.node.start_date) return entry.node.start_date;
+
+	const year = entry.node.start_season?.year;
+
+	if (!year) return '9999-99-99';
+
+	const season = entry.node.start_season?.season;
+
+	const month =
+		season === 'winter'
+			? '01'
+			: season === 'spring'
+				? '04'
+				: season === 'summer'
+					? '07'
+					: season === 'fall'
+						? '10'
+						: '99';
+
+	return `${year}-${month}-01`;
 }
 
 export function getProgressValue(entry: UserAnimeListEdge) {

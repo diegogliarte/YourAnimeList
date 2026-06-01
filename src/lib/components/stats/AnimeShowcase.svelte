@@ -54,7 +54,7 @@
 				rel="noreferrer"
 				class="group overflow-hidden rounded-md border border-border bg-background transition hover:border-primary/70 hover:bg-surface-soft"
 			>
-				<div class="h-56 w-full overflow-hidden bg-surface-soft">
+				<div class="h-36 w-full overflow-hidden bg-surface-soft">
 					{#if imageUrl(item)}
 						<img
 							src={imageUrl(item)}
@@ -78,15 +78,6 @@
 							you <span class="text-primary">{formatUserScore(item)}</span>
 						</p>
 
-						{#if metric === 'popularity'}
-							<p class="text-right text-text-muted">
-								pop <span class="text-text">#{formatNumber(item.popularity ?? 0)}</span>
-							</p>
-
-							<p class="text-text-muted">
-								MAL <span class="text-text-soft">{formatDecimal(item.malScore ?? 0, 2)}</span>
-							</p>
-						{:else}
 							<p
 								class={`text-right ${
 									(item.diff ?? 0) >= 0 ? 'text-emerald-400' : 'text-red-400'
@@ -94,7 +85,12 @@
 							>
 								{formatSigned(item.diff ?? 0)}
 							</p>
+						{#if metric === 'popularity'}
+							<p class="text-text-muted whitespace-nowrap">
+								pop <span class="text-text">#{formatNumber(item.popularity ?? 0)}</span>
+							</p>
 
+						{:else}
 							<p class="text-text-muted">
 								MAL <span class="text-text-soft">{formatDecimal(item.malScore ?? 0, 2)}</span>
 							</p>

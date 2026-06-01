@@ -4,6 +4,7 @@ import type {
 	AnimeDetails,
 	AnimeRankingEdge,
 	AnimeRankingType,
+	AnimeSearchEdge,
 	UserAnimeListEdge
 } from '$lib/types/anime';
 
@@ -31,7 +32,7 @@ export const RANKING_TYPES = new Set<AnimeRankingType>([
 	'favorite'
 ]);
 
-const BASE_ANIME_FIELDS = [
+const USER_ANIME_FIELDS = [
 	'id',
 	'title',
 	'main_picture',
@@ -43,40 +44,74 @@ const BASE_ANIME_FIELDS = [
 	'popularity',
 	'num_list_users',
 	'num_scoring_users',
-	'nsfw',
 	'genres',
-	'created_at',
-	'updated_at',
 	'media_type',
 	'status',
 	'num_episodes',
 	'start_season',
-	'broadcast',
 	'source',
 	'average_episode_duration',
-	'rating',
 	'studios'
+];
+
+const RANKING_ANIME_FIELDS = [
+	'id',
+	'title',
+	'main_picture',
+	'alternative_titles',
+	'start_date',
+	'mean',
+	'popularity',
+	'genres',
+	'media_type',
+	'status',
+	'num_episodes',
+	'start_season'
+];
+
+const SEARCH_ANIME_FIELDS = [
+	'id',
+	'title',
+	'main_picture',
+	'media_type',
+	'start_date',
+	'start_season'
+];
+
+const DETAILS_ANIME_FIELDS = [
+	'id',
+	'title',
+	'main_picture',
+	'alternative_titles',
+	'start_date',
+	'end_date',
+	'mean',
+	'popularity',
+	'genres',
+	'media_type',
+	'status',
+	'num_episodes',
+	'start_season',
+	'average_episode_duration',
+	'related_anime'
 ];
 
 const LIST_STATUS_FIELD =
 	'list_status{status,score,num_episodes_watched,is_rewatching,start_date,finish_date,priority,num_times_rewatched,rewatch_value,tags,updated_at}';
 
-const RELATED_ANIME_FIELD = `related_anime{
-	node{${BASE_ANIME_FIELDS.join(',')}},
-	relation_type,
-	relation_type_formatted
-}`;
+export const ANIME_FIELDS = USER_ANIME_FIELDS.join(',');
 
-export const ANIME_FIELDS = BASE_ANIME_FIELDS.join(',');
+export const USER_ANIME_LIST_FIELDS = [...USER_ANIME_FIELDS, LIST_STATUS_FIELD].join(',');
 
-export const USER_ANIME_LIST_FIELDS = [...BASE_ANIME_FIELDS, LIST_STATUS_FIELD].join(',');
+export const ANIME_RANKING_FIELDS = RANKING_ANIME_FIELDS.join(',');
 
-export const ANIME_DETAILS_FIELDS = [
-	...BASE_ANIME_FIELDS,
-	'pictures',
-	'background',
-	RELATED_ANIME_FIELD
-].join(',');
+export const ANIME_SEARCH_FIELDS = SEARCH_ANIME_FIELDS.join(',');
+
+export const ANIME_DETAILS_FIELDS = DETAILS_ANIME_FIELDS.join(',');
+
+const MAL_REQUEST_INTERVAL_MS = 250;
+
+let malRequestQueue = Promise.resolve();
 
 export function getMalHeaders(): HeadersInit {
 	if (!env.MAL_CLIENT_ID) {
@@ -86,6 +121,25 @@ export function getMalHeaders(): HeadersInit {
 	return {
 		'X-MAL-CLIENT-ID': env.MAL_CLIENT_ID
 	};
+}
+
+async function waitForMalRateLimit() {
+	const previousQueue = malRequestQueue;
+
+	let releaseCurrentRequest: () => void;
+
+	malRequestQueue = new Promise<void>((resolve) => {
+		releaseCurrentRequest = resolve;
+	});
+
+	await previousQueue;
+	await sleep(MAL_REQUEST_INTERVAL_MS);
+
+	releaseCurrentRequest!();
+}
+
+function sleep(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function fetchMalJson<T>(
@@ -101,6 +155,8 @@ export async function fetchMalJson<T>(
 
 		apiUrl.searchParams.set(key, String(value));
 	}
+
+	await waitForMalRateLimit();
 
 	const response = await fetcher(apiUrl, {
 		headers: getMalHeaders()
@@ -157,12 +213,32 @@ export async function fetchAnimeRanking(
 		'/anime/ranking',
 		{
 			ranking_type: rankingType,
-			fields: ANIME_FIELDS,
+			fields: ANIME_RANKING_FIELDS,
 			limit,
 			offset,
 			nsfw: true
 		},
 		'Failed to fetch anime ranking'
+	);
+
+	return {
+		data: body.data ?? [],
+		nextOffset: getNextOffset(body.paging?.next)
+	};
+}
+
+export async function fetchAnimeSearch(fetcher: Fetch, query: string, limit: number, offset: number) {
+	const body = await fetchMalJson<MalPagedResponse<AnimeSearchEdge>>(
+		fetcher,
+		'/anime',
+		{
+			q: query,
+			fields: ANIME_SEARCH_FIELDS,
+			limit,
+			offset,
+			nsfw: true
+		},
+		'Failed to search anime'
 	);
 
 	return {

@@ -163,9 +163,33 @@ export type AnimeRankingResponse = {
 	data: AnimeRankingEdge[];
 };
 
+export type AnimeSearchEdge = AnimeEdge;
+
+export type AnimeSearchResponse = {
+	query: string;
+	count: number;
+	nextOffset: number | null;
+	data: AnimeSearchEdge[];
+};
+
+export type AnimeRelationType =
+	| 'sequel'
+	| 'prequel'
+	| 'alternative_setting'
+	| 'alternative_version'
+	| 'side_story'
+	| 'parent_story'
+	| 'summary'
+	| 'full_story'
+	| 'character'
+	| 'other'
+	| (string & {});
+
+export type RelatedAnimeNode = Pick<Anime, 'id' | 'title'> & Partial<Anime>;
+
 export type RelatedAnimeEdge = {
-	node: Anime;
-	relation_type: string;
+	node: RelatedAnimeNode;
+	relation_type: AnimeRelationType;
 	relation_type_formatted: string;
 };
 
@@ -177,4 +201,20 @@ export type AnimeDetails = Anime & {
 
 export type AnimeDetailsResponse = {
 	data: AnimeDetails;
+};
+
+export type FranchiseRelation = {
+	fromId: number;
+	toId: number;
+	relationType: string;
+	relationLabel: string;
+};
+
+export type FranchiseCandidate = {
+	animeId: number;
+	fromId: number;
+	title: string;
+	imageUrl?: string | null;
+	relationType: string;
+	relationLabel: string;
 };

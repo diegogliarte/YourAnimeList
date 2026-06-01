@@ -3,16 +3,17 @@
 
 	type Props = {
 		status?: AnimeListStatusName | null;
+		class?: string;
 	};
 
-	let { status }: Props = $props();
+	let { status, class: className = '' }: Props = $props();
 
 	const labels: Record<AnimeListStatusName, string> = {
 		watching: 'Watching',
 		completed: 'Completed',
 		on_hold: 'On Hold',
 		dropped: 'Dropped',
-		plan_to_watch: 'Planned'
+		plan_to_watch: 'Plan to Watch'
 	};
 
 	const classes: Record<AnimeListStatusName, string> = {
@@ -24,12 +25,6 @@
 	};
 </script>
 
-{#if status}
-	<span class={`inline-flex rounded-md border px-2 py-1 text-xs ${classes[status]}`}>
-		{labels[status]}
-	</span>
-{:else}
-	<span class="inline-flex rounded-md border border-border px-2 py-1 text-xs text-text-muted">
-		Unknown
-	</span>
-{/if}
+<span class={`inline-flex rounded-sm border px-1 py-0.5 text-xs ${status ? classes[status] : ''} ${className}`}>
+	{status ? labels[status] : 'Unknown'}
+</span>

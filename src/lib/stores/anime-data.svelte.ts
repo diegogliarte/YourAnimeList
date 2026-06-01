@@ -1,11 +1,23 @@
 import { browser } from '$app/environment';
 import type {
+	AnimeDetails,
+	AnimeDetailsResponse,
 	AnimeRankingEdge,
 	AnimeRankingResponse,
 	AnimeRankingType,
+	AnimeSearchEdge,
+	AnimeSearchResponse,
+	FranchiseCandidate,
+	FranchiseRelation,
+	RelatedAnimeEdge,
 	UserAnimeListEdge,
 	UserAnimeListResponse
 } from '$lib/types/anime';
+import {
+	compareAnimeRelease,
+	EXCLUDED_FRANCHISE_RELATIONS,
+	INCLUDED_FRANCHISE_RELATIONS
+} from '$lib/utils/anime.utils';
 
 const STORAGE_KEY = 'your-anime-list:data';
 
@@ -32,7 +44,26 @@ class AnimeDataStore {
 	rankingLoadingMore = $state(false);
 	rankingError = $state<string | null>(null);
 
+	franchiseQuery = $state('');
+	franchiseSearchResults = $state<AnimeSearchEdge[]>([]);
+	franchiseSearchLoading = $state(false);
+	franchiseSearchError = $state<string | null>(null);
+
+	franchiseSeedId = $state<number | null>(null);
+	franchiseAnimeById = $state<Record<number, AnimeDetails>>({});
+	franchiseAcceptedIds = $state<number[]>([]);
+	franchiseRejectedIds = $state<number[]>([]);
+	franchiseVisitedIds = $state<number[]>([]);
+	franchiseQueue = $state<number[]>([]);
+	franchiseRelations = $state<FranchiseRelation[]>([]);
+	franchisePendingCandidates = $state<FranchiseCandidate[]>([]);
+	franchiseCrawling = $state(false);
+	franchiseError = $state<string | null>(null);
+
 	private rankingRequestId = 0;
+	private franchiseSearchRequestId = 0;
+	private franchiseRunId = 0;
+	private franchiseStopRequested = false;
 
 	constructor() {
 		this.restore();
@@ -56,6 +87,25 @@ class AnimeDataStore {
 
 	get hasRankingData() {
 		return this.rankingData.length > 0;
+	}
+
+	get franchiseAnimeList() {
+		return this.franchiseAcceptedIds
+			.map((id) => this.franchiseAnimeById[id])
+			.filter(Boolean)
+			.sort((a, b) => compareAnimeRelease({ node: a }, { node: b }));
+	}
+
+	get franchisePendingList() {
+		return [...this.franchisePendingCandidates].sort((a, b) => a.title.localeCompare(b.title));
+	}
+
+	get hasFranchise() {
+		return this.franchiseAcceptedIds.length > 0;
+	}
+
+	get franchiseVisitedCount() {
+		return this.franchiseVisitedIds.length;
 	}
 
 	async loadUserList(username = this.username) {
@@ -183,6 +233,120 @@ class AnimeDataStore {
 		await this.loadAnimeRanking(this.rankingType, 0, false, true);
 	}
 
+	async searchFranchiseAnime(query = this.franchiseQuery) {
+		const cleanQuery = query.trim();
+
+		if (!cleanQuery) {
+			this.franchiseSearchError = 'Search is required';
+			return;
+		}
+
+		const currentRequestId = ++this.franchiseSearchRequestId;
+
+		this.franchiseQuery = cleanQuery;
+		this.franchiseSearchLoading = true;
+		this.franchiseSearchError = null;
+
+		try {
+			const params = new URLSearchParams({
+				q: cleanQuery,
+				limit: '20'
+			});
+
+			const response = await fetch(`/api/mal/anime/search?${params.toString()}`);
+
+			if (!response.ok) {
+				const message = await response.text();
+				throw new Error(message || 'Failed to search anime');
+			}
+
+			const result = (await response.json()) as AnimeSearchResponse;
+
+			if (currentRequestId !== this.franchiseSearchRequestId) return;
+
+			this.franchiseSearchResults = result.data;
+		} catch (error) {
+			if (currentRequestId !== this.franchiseSearchRequestId) return;
+
+			this.franchiseSearchResults = [];
+			this.franchiseSearchError =
+				error instanceof Error ? error.message : 'Failed to search anime';
+		} finally {
+			if (currentRequestId === this.franchiseSearchRequestId) {
+				this.franchiseSearchLoading = false;
+			}
+		}
+	}
+
+	async startFranchise(seedId: number) {
+		this.clearFranchise();
+
+		const runId = ++this.franchiseRunId;
+
+		this.franchiseSeedId = seedId;
+		this.addAcceptedId(seedId);
+		this.enqueueFranchiseAnime(seedId);
+
+		await this.crawlFranchiseQueue(runId);
+	}
+
+	async addAnimeToFranchise(animeId: number) {
+		if (!this.hasFranchise) {
+			await this.startFranchise(animeId);
+			return;
+		}
+
+		const runId = this.franchiseRunId;
+
+		this.franchiseRejectedIds = this.franchiseRejectedIds.filter((id) => id !== animeId);
+		this.removePendingCandidate(animeId);
+		this.addAcceptedId(animeId);
+		this.enqueueFranchiseAnime(animeId);
+
+		await this.crawlFranchiseQueue(runId);
+	}
+
+	async acceptFranchiseCandidate(animeId: number) {
+		const candidate = this.franchisePendingCandidates.find((item) => item.animeId === animeId);
+
+		if (!candidate) return;
+
+		const runId = this.franchiseRunId;
+
+		this.removePendingCandidate(animeId);
+		this.franchiseRejectedIds = this.franchiseRejectedIds.filter((id) => id !== animeId);
+
+		this.addAcceptedId(animeId);
+		this.addFranchiseRelation({
+			fromId: candidate.fromId,
+			toId: candidate.animeId,
+			relationType: candidate.relationType,
+			relationLabel: candidate.relationLabel
+		});
+		this.enqueueFranchiseAnime(animeId);
+
+		await this.crawlFranchiseQueue(runId);
+	}
+
+	rejectFranchiseCandidate(animeId: number) {
+		this.removePendingCandidate(animeId);
+		this.addRejectedId(animeId);
+
+		this.franchiseRelations = this.franchiseRelations.filter((relation) => {
+			return relation.toId !== animeId && relation.fromId !== animeId;
+		});
+
+		this.franchiseAcceptedIds = this.franchiseAcceptedIds.filter((id) => id !== animeId);
+		this.franchiseQueue = this.franchiseQueue.filter((id) => id !== animeId);
+	}
+
+	stopFranchiseCrawl() {
+		this.franchiseStopRequested = true;
+		this.franchiseRunId += 1;
+		this.franchiseQueue = [];
+		this.franchiseCrawling = false;
+	}
+
 	clearUserList() {
 		this.username = '';
 		this.loadedUsername = '';
@@ -199,6 +363,197 @@ class AnimeDataStore {
 		this.rankingDataByType = {};
 		this.rankingNextOffsetByType = {};
 		this.rankingError = null;
+	}
+
+	clearFranchise() {
+		this.franchiseRunId += 1;
+		this.franchiseStopRequested = true;
+
+		this.franchiseSeedId = null;
+		this.franchiseAnimeById = {};
+		this.franchiseAcceptedIds = [];
+		this.franchiseRejectedIds = [];
+		this.franchiseVisitedIds = [];
+		this.franchiseQueue = [];
+		this.franchiseRelations = [];
+		this.franchisePendingCandidates = [];
+		this.franchiseCrawling = false;
+		this.franchiseError = null;
+	}
+
+	private async crawlFranchiseQueue(runId: number) {
+		if (this.franchiseCrawling) return;
+
+		this.franchiseCrawling = true;
+		this.franchiseError = null;
+		this.franchiseStopRequested = false;
+
+		try {
+			while (
+				this.franchiseQueue.length > 0 &&
+				!this.franchiseStopRequested &&
+				runId === this.franchiseRunId
+				) {
+				const animeId = this.franchiseQueue[0];
+
+				this.franchiseQueue = this.franchiseQueue.slice(1);
+
+				await this.crawlFranchiseAnime(animeId, runId);
+			}
+		} catch (error) {
+			if (runId === this.franchiseRunId) {
+				this.franchiseError =
+					error instanceof Error ? error.message : 'Failed to crawl franchise';
+			}
+		} finally {
+			if (runId === this.franchiseRunId) {
+				this.franchiseCrawling = false;
+			}
+		}
+	}
+
+	private async crawlFranchiseAnime(animeId: number, runId: number) {
+		if (runId !== this.franchiseRunId) return;
+		if (this.franchiseVisitedIds.includes(animeId)) return;
+
+		const details = await this.fetchFranchiseAnimeDetails(animeId);
+
+		if (runId !== this.franchiseRunId || this.franchiseStopRequested) return;
+
+		this.addVisitedId(animeId);
+
+		this.franchiseAnimeById = {
+			...this.franchiseAnimeById,
+			[details.id]: details
+		};
+
+		this.addAcceptedId(details.id);
+
+		for (const relation of details.related_anime ?? []) {
+			if (runId !== this.franchiseRunId || this.franchiseStopRequested) return;
+
+			this.processFranchiseRelation(details.id, relation);
+		}
+	}
+
+	private processFranchiseRelation(fromId: number, relation: RelatedAnimeEdge) {
+		const toId = relation.node.id;
+		const relationType = relation.relation_type;
+		const relationLabel = relation.relation_type_formatted || relationType;
+
+		if (this.franchiseRejectedIds.includes(toId)) return;
+
+		if (INCLUDED_FRANCHISE_RELATIONS.has(relationType)) {
+			this.removePendingCandidate(toId);
+			this.addFranchiseRelation({
+				fromId,
+				toId,
+				relationType,
+				relationLabel
+			});
+			this.addAcceptedId(toId);
+			this.enqueueFranchiseAnime(toId);
+			return;
+		}
+
+		if (this.franchiseAcceptedIds.includes(toId)) {
+			this.addFranchiseRelation({
+				fromId,
+				toId,
+				relationType,
+				relationLabel
+			});
+			this.enqueueFranchiseAnime(toId);
+			return;
+		}
+
+		if (
+			EXCLUDED_FRANCHISE_RELATIONS.has(relationType) ||
+			!INCLUDED_FRANCHISE_RELATIONS.has(relationType)
+		) {
+			this.addPendingCandidate({
+				animeId: toId,
+				fromId,
+				title: relation.node.title,
+				imageUrl: relation.node.main_picture?.medium ?? relation.node.main_picture?.large ?? null,
+				relationType,
+				relationLabel
+			});
+		}
+	}
+
+	private async fetchFranchiseAnimeDetails(animeId: number) {
+		const cached = this.franchiseAnimeById[animeId];
+
+		if (cached) return cached;
+
+		const response = await fetch(`/api/mal/anime/${animeId}`);
+
+		if (!response.ok) {
+			const message = await response.text();
+			throw new Error(message || `Failed to fetch anime ${animeId}`);
+		}
+
+		const result = (await response.json()) as AnimeDetailsResponse;
+
+		return result.data;
+	}
+
+	private enqueueFranchiseAnime(animeId: number) {
+		if (this.franchiseVisitedIds.includes(animeId)) return;
+		if (this.franchiseQueue.includes(animeId)) return;
+
+		this.franchiseQueue = [...this.franchiseQueue, animeId];
+	}
+
+	private addAcceptedId(animeId: number) {
+		if (!this.franchiseAcceptedIds.includes(animeId)) {
+			this.franchiseAcceptedIds = [...this.franchiseAcceptedIds, animeId];
+		}
+
+		this.removePendingCandidate(animeId);
+	}
+
+	private addRejectedId(animeId: number) {
+		if (this.franchiseRejectedIds.includes(animeId)) return;
+
+		this.franchiseRejectedIds = [...this.franchiseRejectedIds, animeId];
+	}
+
+	private addVisitedId(animeId: number) {
+		if (this.franchiseVisitedIds.includes(animeId)) return;
+
+		this.franchiseVisitedIds = [...this.franchiseVisitedIds, animeId];
+	}
+
+	private addFranchiseRelation(relation: FranchiseRelation) {
+		const exists = this.franchiseRelations.some((current) => {
+			return (
+				current.fromId === relation.fromId &&
+				current.toId === relation.toId &&
+				current.relationType === relation.relationType
+			);
+		});
+
+		if (exists) return;
+
+		this.franchiseRelations = [...this.franchiseRelations, relation];
+	}
+
+	private addPendingCandidate(candidate: FranchiseCandidate) {
+		if (this.franchiseAcceptedIds.includes(candidate.animeId)) return;
+		if (this.franchiseRejectedIds.includes(candidate.animeId)) return;
+		if (this.franchisePendingCandidates.some((item) => item.animeId === candidate.animeId)) {
+			return;
+		}
+
+		this.franchisePendingCandidates = [...this.franchisePendingCandidates, candidate];
+	}
+
+	private removePendingCandidate(animeId: number) {
+		this.franchisePendingCandidates = this.franchisePendingCandidates.filter((candidate) => {
+			return candidate.animeId !== animeId;
+		});
 	}
 
 	private restore() {
