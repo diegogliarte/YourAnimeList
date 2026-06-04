@@ -29,6 +29,25 @@
 
 	let showSearch = $state(false);
 	let showMalScore = $state(true);
+	let autoAccept = $state(false);
+
+	const autoAcceptingAnimeIds = new Set<number>();
+
+	$effect(() => {
+		if (!autoAccept) return;
+
+		for (const candidate of animeData.franchisePendingList) {
+			if (autoAcceptingAnimeIds.has(candidate.animeId)) continue;
+
+			autoAcceptingAnimeIds.add(candidate.animeId);
+
+			void animeData
+				.acceptFranchiseCandidate(candidate.animeId)
+				.finally(() => {
+					autoAcceptingAnimeIds.delete(candidate.animeId);
+				});
+		}
+	});
 
 	const columns: TableColumn<AnimeDetails>[] = $derived.by(() => {
 		const baseColumns: TableColumn<AnimeDetails>[] = [
@@ -323,8 +342,10 @@
 				</div>
 			{/if}
 
-			<Toggle bind:checked={showMalScore} label="MAL score" class="ml-auto" />
-		</div>
+			<div class="ml-auto flex items-center gap-3">
+				<Toggle bind:checked={autoAccept} label="Auto accept" />
+				<Toggle bind:checked={showMalScore} label="MAL score" />
+			</div>		</div>
 	</Panel>
 
 	{#if shouldShowSearch && animeData.franchiseSearchResults.length > 0}
