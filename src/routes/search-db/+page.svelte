@@ -5,9 +5,11 @@
 	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import SelectInput, { type SelectOption } from '$lib/components/ui/SelectInput.svelte';
+	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import Table, { type TableColumn } from '$lib/components/ui/Table.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
+	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type {
 		AnimeDbEntry,
 		AnimeDbFacetItem,
@@ -15,6 +17,7 @@
 		AnimeDbFilters,
 		AnimeDbNamedFacetItem
 	} from '$lib/types/anime-db';
+	import type { AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
 	import {
 		formatDecimal,
 		formatDuration,
@@ -61,6 +64,16 @@
 	let requestId = 0;
 	let lastFilterSignature = '';
 	let filterDebounce: ReturnType<typeof setTimeout> | null = null;
+
+	const userEntryByAnimeId = $derived.by(() => {
+		const entries = new Map<number, UserAnimeListEdge>();
+
+		for (const entry of animeData.userList) {
+			entries.set(entry.node.id, entry);
+		}
+
+		return entries;
+	});
 
 	const filterSignature = $derived(
 		JSON.stringify({
@@ -252,7 +265,7 @@
 		} catch {
 			if (currentRequestId !== requestId) return;
 
-			error = 'The anime DB seems down.';
+			error = 'The anime DB is down.';
 		} finally {
 			if (currentRequestId === requestId) {
 				loading = false;
@@ -337,6 +350,14 @@
 			value: String(item.id),
 			label: `${item.name} (${formatNumber(item.count)})`
 		}));
+	}
+
+	function getUserEntry(animeId: number) {
+		return userEntryByAnimeId.get(animeId);
+	}
+
+	function getUserStatus(animeId: number): AnimeListStatusName | null {
+		return getUserEntry(animeId)?.list_status?.status ?? null;
 	}
 
 	function getImageUrl(anime: AnimeDbEntry) {
@@ -556,8 +577,12 @@
 									{anime.title}
 								</a>
 
-								<span class="text-xs text-text-muted">
-									{getSubtitle(anime)}
+								<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
+									<StatusBadge status={getUserStatus(anime.id)} />
+
+									<span class="truncate">
+										{getSubtitle(anime)}
+									</span>
 								</span>
 							</div>
 						</div>
