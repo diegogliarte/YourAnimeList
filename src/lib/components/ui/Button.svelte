@@ -18,12 +18,15 @@
 		...rest
 	}: Props = $props();
 
-	const base =
-		'cursor-pointer rounded-md border px-2 py-1 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50';
+	const base = `
+		inline-flex min-h-8 cursor-pointer items-center justify-center rounded-md border px-2 py-1
+		text-sm font-medium leading-none transition
+		disabled:cursor-not-allowed disabled:opacity-50
+	`;
 
 	const variants: Record<Variant, string> = {
 		default: 'border-border bg-surface text-text hover:bg-surface-soft',
-		primary: 'border-primary bg-primary text-background hover:bg-accent'
+		primary: 'border-primary bg-primary text-background hover:bg-primary/90'
 	};
 </script>
 

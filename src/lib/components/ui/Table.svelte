@@ -12,7 +12,7 @@
 
 <script lang="ts" generics="Item">
 	import type { Snippet } from 'svelte';
-	import TextInput from '$lib/components/ui/TextInput.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 
 	type Props = {
 		items: Item[];
@@ -110,7 +110,7 @@
 <div class={`overflow-hidden rounded-md border border-border bg-surface ${className}`}>
 	{#if filterText}
 		<div class="border-b border-border bg-surface p-2">
-			<TextInput bind:value={query} placeholder={filterPlaceholder} />
+			<Input bind:value={query} placeholder={filterPlaceholder} />
 		</div>
 	{/if}
 

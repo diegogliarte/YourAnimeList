@@ -4,7 +4,7 @@
 	import StatCard from '$lib/components/ui/StatCard.svelte';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
 	import Table, { type TableColumn } from '$lib/components/ui/Table.svelte';
-	import TextInput from '$lib/components/ui/TextInput.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { AnimeDetails, AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
@@ -309,7 +309,7 @@
 				submitSearch();
 			}}
 				>
-					<TextInput
+					<Input
 						bind:value={animeData.franchiseQuery}
 						placeholder="Search anime..."
 						class="w-60"

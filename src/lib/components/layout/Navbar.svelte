@@ -1,14 +1,15 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import Button from '$lib/components/ui/Button.svelte';
-	import TextInput from '$lib/components/ui/TextInput.svelte';
+	import Input from '$lib/components/ui/Input.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 
 	const tabs = [
 		{ label: 'List', href: '/list' },
 		{ label: 'Stats', href: '/stats' },
 		{ label: 'Top Anime', href: '/top-anime' },
-		{ label: 'Franchises', href: '/franchises' }
+		{ label: 'Franchises', href: '/franchises' },
+		{ label: 'Search DB', href: '/search-db' }
 	];
 
 	const isActive = (href: string) => page.url.pathname === href;
@@ -48,7 +49,7 @@
 				loadUserList();
 			}}
 		>
-			<TextInput
+			<Input
 				bind:value={animeData.username}
 				placeholder="MAL username"
 				class="h-8 w-28 px-2 py-1 text-xs sm:w-40"
