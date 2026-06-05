@@ -1,187 +1,133 @@
 # YourAnimeList
 
-MAL flow sucks.
+MAL's flow sucks.
 
-This is a small anime dashboard tailored for my own needs, mainly so I do not lose my data every time I refresh the page, change tabs, or look at something else for two seconds.
+This is a small anime dashboard tailored for how I actually use my list, so I do not lose my data every reload and I can mix normal anime discovery with my own MAL data.
 
-It uses normal MAL data, but makes it useful with the user's own list.
+Hosted at:
 
-Live: https://anime.diegogliarte.com
-
-## Problem
-
-MAL has the data.
-
-But using it is annoying.
-
-You want to check:
-
-```txt
-What did I complete?
-What am I missing?
-How much time did this franchise take?
-What top anime are already in my list?
-What related anime should I watch next?
-```
-
-MAL says:
-
-```txt
-good luck
-```
+https://anime.diegogliarte.com
 
 ## What it does
 
-Loads a user's MAL anime list.
+Load a MyAnimeList username.
 
-Then lets you use it properly.
+Then you get:
 
-## Pages
-
-```txt
-/list
-/stats
-/top-anime
-/franchises
-```
+* List
+* Stats
+* Top Anime
+* Franchises
+* All Anime
 
 ## List
 
-A better anime list.
+Your MAL list, but nicer.
 
-Sort by:
+Filter by status, sort the table, hide/show MAL scores, and keep the loaded user cached locally.
 
-```txt
-score
-MAL score
-progress
-episodes
-season
-```
-
-Filter by:
-
-```txt
-all
-watching
-completed
-on hold
-dropped
-planned
-```
-
-Also supports my very scientific scoring tags:
-
-```txt
-8+
-8
-8-
-```
-
-Yes, this matters.
+Very advanced technology: not making me reload everything every time.
 
 ## Stats
 
-Numbers.
+Personal stats from the loaded MAL user.
 
-Runtime, episodes, averages, score spread, rewatches, completion, charts, showcases.
+Also has small showcases like:
 
-Basically:
+* Hidden gems
+* Hot takes
+* Most obscure
+* Popular misses
 
-```txt
-MAL profile stats, but less sad.
-```
+Anime homework, but with cards.
 
 ## Top Anime
 
-MAL rankings, but with your list mixed in.
+Uses MAL rankings.
 
-You can exclude:
+Supports:
 
-```txt
-completed
-watching
-on hold
-dropped
-planned
-```
+* Top
+* Airing
+* Upcoming
+* TV
+* Movies
+* OVA
+* Specials
+* Popular
+* Favorites
 
-So the top list becomes useful instead of showing you 400 things you already know exist.
+You can also exclude anime already in your own list.
+
+Because yes, I know Fullmetal Alchemist exists.
 
 ## Franchises
 
-Search an anime.
+Search an anime, pick a seed, and crawl related anime.
 
-Pick one.
+Included relations are accepted automatically. Weird/optional relations can be accepted or rejected manually.
 
-It crawls related anime and builds a release-order-ish franchise list.
+Useful for franchise watch orders, especially when MAL relations are... MAL relations.
 
-Useful for things like:
+You can also manually add another anime into the current franchise when MAL refuses to connect obvious things.
 
-```txt
-Fate
-Monogatari
-Gundam
-Dragon Ball
-whatever mess MAL relations allow
-```
+## All Anime
 
-Some relations are accepted automatically.
+This uses my own scraped MAL SQLite database, served from a tiny API on my Raspberry Pi.
 
-Some suspicious relations ask first.
+Frontend is still on Netlify.
 
-Because anime databases are chaos.
+DB API is not.
 
-## Stack
+Flow:
 
 ```txt
-SvelteKit
-Svelte 5
-Tailwind CSS
-MyAnimeList API
-Netlify
+Netlify frontend
+-> Cloudflare
+-> Caddy
+-> Raspberry Pi API
+-> SQLite
 ```
 
-## Setup
+This page supports filtering/sorting the full anime database with infinite scroll.
 
-Create `.env`:
+Examples:
+
+* oldest anime
+* lowest MAL mean
+* most obscure
+* most popular
+* by media type
+* by genre
+* by studio
+* by year
+* by episodes
+* by score range
+
+If the Pi is down, the page just says the DB is down.
+
+## Environment
+
+Frontend:
 
 ```env
+PUBLIC_ANIME_DB_API_URL=https://api-anime.diegogliarte.com
 MAL_CLIENT_ID=your_mal_client_id
 ```
 
-Install:
+The MAL client ID is used by the SvelteKit server routes.
+
+The anime DB API URL is public and used directly by the browser.
+
+## Local dev
 
 ```bash
 pnpm install
+pnpm dev
 ```
 
-Run:
+## Build
 
 ```bash
-pnpm run dev
+pnpm build
 ```
-
-Build:
-
-```bash
-pnpm run build
-```
-
-## Deploy
-
-Hosted on Netlify.
-
-Required environment variable:
-
-```env
-MAL_CLIENT_ID=your_mal_client_id
-```
-
-## Notes
-
-This uses the official MyAnimeList API.
-
-It is built for me.
-
-If it also works for you, suspiciously good.
