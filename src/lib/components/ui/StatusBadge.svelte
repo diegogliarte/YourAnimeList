@@ -11,9 +11,9 @@
 	const labels: Record<AnimeListStatusName, string> = {
 		watching: 'Watching',
 		completed: 'Completed',
-		on_hold: 'On Hold',
+		on_hold: 'Hold',
 		dropped: 'Dropped',
-		plan_to_watch: 'Plan to Watch'
+		plan_to_watch: 'Plan'
 	};
 
 	const classes: Record<AnimeListStatusName, string> = {
@@ -27,7 +27,11 @@
 
 {#if status}
 	<span
-		class={`inline-flex rounded-sm border px-1 py-0.5 text-xs ${classes[status]} ${className}`}
+		class={`
+			inline-flex shrink-0 items-center rounded-sm border px-1 py-px
+			text-[10px]
+			${classes[status]} ${className}
+		`}
 	>
 		{labels[status]}
 	</span>

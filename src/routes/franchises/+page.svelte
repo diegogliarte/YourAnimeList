@@ -1,25 +1,21 @@
 <script lang="ts">
+	import AnimeTable from '$lib/components/ui/AnimeTable.svelte';
 	import FranchiseGraph from '$lib/components/franchise/FranchiseGraph.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import StatCard from '$lib/components/ui/StatCard.svelte';
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
-	import Table, { type TableColumn } from '$lib/components/ui/Table.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { AnimeDetails, AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
 	import {
 		compareAnimeRelease,
-		formatProgress,
 		formatSeason,
 		getAnimeUrl,
-		getRankingFilterText
 	} from '$lib/utils/anime.utils';
 	import {
 		formatDecimal,
 		formatDuration,
-		formatLabel,
 		formatNumber
 	} from '$lib/utils/format.utils';
 
@@ -30,7 +26,6 @@
 	};
 
 	let showSearch = $state(false);
-	let showMalScore = $state(true);
 	let autoAccept = $state(false);
 	let franchiseView = $state<'list' | 'graph'>('list');
 	let pendingCollapsed = $state(false);
@@ -49,54 +44,6 @@
 				autoAcceptingAnimeIds.delete(candidate.animeId);
 			});
 		}
-	});
-
-	const columns: TableColumn<AnimeDetails>[] = $derived.by(() => {
-		const baseColumns: TableColumn<AnimeDetails>[] = [
-			{
-				label: '#',
-				value: 'index',
-				width: '3rem'
-			},
-			{
-				label: 'Anime',
-				value: 'title',
-				width: '26rem',
-				compare: (a, b) => a.title.localeCompare(b.title)
-			},
-			{
-				label: 'Score',
-				value: 'score',
-				align: 'center',
-				width: '4.5rem',
-				compare: (a, b) => getUserScore(a.id) - getUserScore(b.id)
-			},
-			{
-				label: 'Progress',
-				value: 'progress',
-				align: 'center',
-				width: '5.5rem'
-			},
-			{
-				label: 'Episodes',
-				value: 'episodes',
-				align: 'center',
-				width: '5rem',
-				compare: (a, b) => (a.num_episodes ?? 0) - (b.num_episodes ?? 0)
-			}
-		];
-
-		if (showMalScore) {
-			baseColumns.push({
-				label: 'MAL',
-				value: 'mal',
-				align: 'center',
-				width: '4.5rem',
-				compare: (a, b) => (a.mean ?? 0) - (b.mean ?? 0)
-			});
-		}
-
-		return baseColumns;
 	});
 
 	const userEntryByAnimeId = $derived.by(() => {
@@ -219,51 +166,6 @@
 		return getUserEntry(animeId)?.list_status?.status ?? null;
 	}
 
-	function getUserStatusLabel(animeId: number) {
-		const status = getUserStatus(animeId);
-
-		return status ? formatLabel(status) : 'Not in list';
-	}
-
-	function getUserScore(animeId: number) {
-		return getUserEntry(animeId)?.list_status?.sort_score ?? 0;
-	}
-
-	function getDisplayScore(animeId: number) {
-		return getUserEntry(animeId)?.list_status?.display_score ?? '-';
-	}
-
-	function getDisplayProgress(animeId: number) {
-		const userEntry = getUserEntry(animeId);
-
-		if (!userEntry) return '-';
-
-		return formatProgress(userEntry);
-	}
-
-	function getRelationLabel(animeId: number) {
-		if (animeData.franchiseSeedId === animeId) return 'Seed';
-
-		const relations = animeData.franchiseRelations.filter((relation) => relation.toId === animeId);
-
-		if (relations.length === 0) return '-';
-
-		return relations
-			.slice(0, 2)
-			.map((relation) => relation.relationLabel)
-			.join(', ');
-	}
-
-	function getRelationSource(animeId: number) {
-		const relation = animeData.franchiseRelations.find((relation) => relation.toId === animeId);
-
-		if (!relation) return '';
-
-		const source = animeData.franchiseAnimeById[relation.fromId];
-
-		return source ? `from ${source.title}` : '';
-	}
-
 	function getSubtitle(anime: AnimeDetails) {
 		return [
 			anime.media_type ?? 'unknown',
@@ -289,28 +191,18 @@
 	}
 
 	function getTotalDurationText(anime: AnimeDetails) {
+		const totalSeconds = getTotalSeconds(anime);
+
+		return totalSeconds > 0 ? `${formatDuration(totalSeconds)} total` : '';
+	}
+
+	function getTotalSeconds(anime: AnimeDetails) {
 		const episodes = anime.num_episodes ?? 0;
 		const duration = anime.average_episode_duration ?? 0;
 
-		if (episodes <= 0 || duration <= 0) return '';
+		if (episodes <= 0 || duration <= 0) return 0;
 
-		return `${formatDuration(episodes * duration)} total`;
-	}
-
-	function getFilterText(anime: AnimeDetails) {
-		return [
-			getRankingFilterText({ node: anime }),
-			getRelationLabel(anime.id),
-			getRelationSource(anime.id),
-			getUserStatusLabel(anime.id),
-			getSubtitle(anime)
-		]
-			.filter(Boolean)
-			.join(' ');
-	}
-
-	function getImageUrl(anime: AnimeDetails) {
-		return anime.main_picture?.medium ?? anime.main_picture?.large;
+		return episodes * duration;
 	}
 </script>
 
@@ -380,7 +272,6 @@
 				{/if}
 
 				<Toggle bind:checked={autoAccept} label="Auto accept" />
-				<Toggle bind:checked={showMalScore} label="MAL score" />
 			</div>
 		</div>
 	</Panel>
@@ -500,70 +391,7 @@
 				getSubtitle={getSubtitle}
 			/>
 		{:else}
-			<Table
-				items={animeData.franchiseAnimeList}
-				{columns}
-				filterText={getFilterText}
-				filterPlaceholder="Filter franchise..."
-			>
-				{#snippet children(anime, index)}
-					<tr class="transition hover:bg-surface-soft">
-						<td class="w-12 px-3 py-2 text-left font-mono text-xs text-text-muted">
-							{index + 1}
-						</td>
-
-						<td class="w-96 max-w-96 px-3 py-2">
-							<div class="flex min-w-0 items-center gap-3">
-								{#if getImageUrl(anime)}
-									<img
-										src={getImageUrl(anime)}
-										alt={anime.title}
-										class="size-9 shrink-0 rounded-md object-cover"
-									/>
-								{:else}
-									<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
-								{/if}
-
-								<div class="min-w-0">
-									<div class="flex min-w-0 items-center gap-2">
-										<a
-											href={getAnimeUrl(anime.id)}
-											target="_blank"
-											rel="noreferrer"
-											class="block max-w-72 truncate font-medium text-text hover:text-primary"
-										>
-											{anime.title}
-										</a>
-									</div>
-
-									<span class="block text-xs text-text-muted">
-										<StatusBadge class="mr-1 mt-0.5" status={getUserStatus(anime.id)} />
-										{getSubtitle(anime)}
-									</span>
-								</div>
-							</div>
-						</td>
-
-						<td class="px-3 py-2 text-center font-medium text-primary">
-							{getDisplayScore(anime.id)}
-						</td>
-
-						<td class="px-3 py-2 text-center text-text-soft">
-							{getDisplayProgress(anime.id)}
-						</td>
-
-						<td class="px-3 py-2 text-center text-text-soft">
-							{anime.num_episodes || '?'}
-						</td>
-
-						{#if showMalScore}
-							<td class="px-3 py-2 text-center text-text-soft">
-								{anime.mean ? formatDecimal(anime.mean, 2) : '-'}
-							</td>
-						{/if}
-					</tr>
-				{/snippet}
-			</Table>
+			<AnimeTable items={animeData.franchiseAnimeList} filterPlaceholder="Filter franchise..." />
 		{/if}
 	{:else if !animeData.franchiseSearchResults.length}
 		<Panel>

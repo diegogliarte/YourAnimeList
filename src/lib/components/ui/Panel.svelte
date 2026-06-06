@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 
 	type Props = {
 		title?: string;
@@ -34,10 +35,10 @@
 >
 	{#if title || description || collapsible}
 		<header class={collapsed ? '' : 'mb-3'}>
-			<div class="flex items-start justify-between gap-3">
+			<div class="flex min-h-7 items-center justify-between gap-3">
 				<div class="min-w-0">
 					{#if title}
-						<h2 class="truncate text-sm font-semibold text-text">{title}</h2>
+						<h2 class="truncate text-sm font-semibold leading-7 text-text">{title}</h2>
 					{/if}
 
 					{#if description}
@@ -46,14 +47,12 @@
 				</div>
 
 				{#if collapsible}
-					<button
+					<Button
 						type="button"
-						class="shrink-0 cursor-pointer rounded-md border border-border bg-surface-soft px-2 py-1 text-xs text-text-soft transition hover:text-text"
-						aria-expanded={!collapsed}
 						onclick={toggleCollapsed}
 					>
 						{collapsed ? 'Expand' : 'Collapse'}
-					</button>
+					</Button>
 				{/if}
 			</div>
 		</header>

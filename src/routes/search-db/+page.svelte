@@ -2,14 +2,11 @@
 	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { fetchAnimeDbFacets, fetchAnimeDbPage } from '$lib/api/anime-db.api';
+	import AnimeTable from '$lib/components/ui/AnimeTable.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import SelectInput, { type SelectOption } from '$lib/components/ui/SelectInput.svelte';
-	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
-	import Table, { type TableColumn } from '$lib/components/ui/Table.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
-	import Toggle from '$lib/components/ui/Toggle.svelte';
-	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type {
 		AnimeDbEntry,
 		AnimeDbFacetItem,
@@ -17,10 +14,7 @@
 		AnimeDbFilters,
 		AnimeDbNamedFacetItem
 	} from '$lib/types/anime-db';
-	import type { AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
 	import {
-		formatDecimal,
-		formatDuration,
 		formatLabel,
 		formatNumber
 	} from '$lib/utils/format.utils';
@@ -57,23 +51,12 @@
 	let episodesMin = $state('');
 	let episodesMax = $state('');
 
-	let showMalScore = $state(true);
 	let sentinel = $state<HTMLDivElement | null>(null);
 
 	let hasInitialized = $state(false);
 	let requestId = 0;
 	let lastFilterSignature = '';
 	let filterDebounce: ReturnType<typeof setTimeout> | null = null;
-
-	const userEntryByAnimeId = $derived.by(() => {
-		const entries = new Map<number, UserAnimeListEdge>();
-
-		for (const entry of animeData.userList) {
-			entries.set(entry.node.id, entry);
-		}
-
-		return entries;
-	});
 
 	const filterSignature = $derived(
 		JSON.stringify({
@@ -109,59 +92,6 @@
 	const nsfwOptions = $derived(makeFacetOptions(facets?.nsfw ?? []));
 	const genreOptions = $derived(makeNamedFacetOptions(facets?.genres ?? []));
 	const studioOptions = $derived(makeNamedFacetOptions(facets?.studios ?? []));
-
-	const columns: TableColumn<AnimeDbEntry>[] = $derived.by(() => {
-		const baseColumns: TableColumn<AnimeDbEntry>[] = [
-			{
-				label: '#',
-				value: 'index',
-				width: '3rem'
-			},
-			{
-				label: 'Anime',
-				value: 'title',
-				width: '24rem'
-			}
-		];
-
-		if (showMalScore) {
-			baseColumns.push({
-				label: 'MAL',
-				value: 'mean',
-				align: 'center',
-				width: '4.5rem'
-			});
-		}
-
-		baseColumns.push(
-			{
-				label: 'Popularity',
-				value: 'popularity',
-				align: 'center',
-				width: '6rem'
-			},
-			{
-				label: 'Episodes',
-				value: 'episodes',
-				align: 'center',
-				width: '5rem'
-			},
-			{
-				label: 'Season',
-				value: 'season',
-				align: 'center',
-				width: '6rem'
-			},
-			{
-				label: 'Runtime',
-				value: 'runtime',
-				align: 'right',
-				width: '6rem'
-			}
-		);
-
-		return baseColumns;
-	});
 
 	onMount(() => {
 		void initialize();
@@ -352,61 +282,6 @@
 		}));
 	}
 
-	function getUserEntry(animeId: number) {
-		return userEntryByAnimeId.get(animeId);
-	}
-
-	function getUserStatus(animeId: number): AnimeListStatusName | null {
-		return getUserEntry(animeId)?.list_status?.status ?? null;
-	}
-
-	function getImageUrl(anime: AnimeDbEntry) {
-		return anime.mainPicture.medium ?? anime.mainPicture.large;
-	}
-
-	function getSubtitle(anime: AnimeDbEntry) {
-		return [
-			anime.mediaType ?? 'unknown',
-			anime.status ? formatLabel(anime.status) : '',
-			anime.source ? formatLabel(anime.source) : '',
-			anime.rating ? formatLabel(anime.rating) : ''
-		]
-			.filter(Boolean)
-			.join(' · ');
-	}
-
-	function formatDbSeason(anime: AnimeDbEntry) {
-		const year = anime.startSeason.year ?? getYearFromDate(anime.startDate);
-		const season = anime.startSeason.season;
-
-		if (!year) return '-';
-		if (!season) return String(year);
-
-		return `${capitalize(season)} ${year}`;
-	}
-
-	function getYearFromDate(date?: string | null) {
-		if (!date) return 0;
-
-		return Number(date.slice(0, 4)) || 0;
-	}
-
-	function capitalize(value: string) {
-		return value.charAt(0).toUpperCase() + value.slice(1);
-	}
-
-	function formatMean(value: number | null) {
-		return typeof value === 'number' ? formatDecimal(value, 2) : '-';
-	}
-
-	function formatPopularity(value: number | null) {
-		return typeof value === 'number' ? `#${formatNumber(value)}` : '-';
-	}
-
-	function formatRuntime(value: number | null) {
-		return value && value > 0 ? formatDuration(value) : '-';
-	}
-
 	function formatFacetLabel(value: string) {
 		return formatLabel(value);
 	}
@@ -433,8 +308,6 @@
 						<span class="text-xs text-text-muted">Updating...</span>
 					{/if}
 				</div>
-
-				<Toggle bind:checked={showMalScore} label="MAL score" class="ml-auto" />
 			</div>
 
 			<div class="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -548,72 +421,9 @@
 			<p>{sort ? formatFacetLabel(sort) : 'Default sort'}</p>
 		</div>
 
-		<Table items={items} {columns}>
-			{#snippet children(anime, index)}
-				<tr class="transition hover:bg-surface-soft">
-					<td class="w-12 px-3 py-2 text-left font-mono text-xs text-text-muted">
-						{index + 1}
-					</td>
+		<AnimeTable items={items} showFilter={false} />
 
-					<td class="w-96 max-w-96 px-3 py-2">
-						<div class="flex min-w-0 items-center gap-3">
-							{#if getImageUrl(anime)}
-								<img
-									src={getImageUrl(anime)}
-									alt={anime.title}
-									class="size-9 shrink-0 rounded-md object-cover"
-								/>
-							{:else}
-								<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
-							{/if}
-
-							<div class="min-w-0">
-								<a
-									href={anime.malUrl}
-									target="_blank"
-									rel="noreferrer"
-									class="block max-w-80 truncate font-medium text-text hover:text-primary"
-								>
-									{anime.title}
-								</a>
-
-								<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
-									<StatusBadge class="mt-0.5" status={getUserStatus(anime.id)} />
-
-									<span class="truncate">
-										{getSubtitle(anime)}
-									</span>
-								</span>
-							</div>
-						</div>
-					</td>
-
-					{#if showMalScore}
-						<td class="px-3 py-2 text-center font-medium text-primary">
-							{formatMean(anime.mean)}
-						</td>
-					{/if}
-
-					<td class="px-3 py-2 text-center text-text-soft">
-						{formatPopularity(anime.popularity)}
-					</td>
-
-					<td class="px-3 py-2 text-center text-text-soft">
-						{anime.numEpisodes || '?'}
-					</td>
-
-					<td class="whitespace-nowrap px-3 py-2 text-center text-text-soft">
-						{formatDbSeason(anime)}
-					</td>
-
-					<td class="whitespace-nowrap px-3 py-2 text-right text-text-soft">
-						{formatRuntime(anime.totalDuration)}
-					</td>
-				</tr>
-			{/snippet}
-		</Table>
-
-		<div bind:this={sentinel} class="h-6"></div>
+		<div bind:this={sentinel}></div>
 
 		{#if loadingMore}
 			<Panel>
