@@ -26,6 +26,29 @@ import {
 
 const STORAGE_KEY = 'your-anime-list:data';
 
+type AnimeDbFranchiseRelatedEdge = RelatedAnimeEdge & {
+	stopped?: boolean;
+	direction?: 'outgoing' | 'incoming';
+	from_id?: number;
+	to_id?: number;
+};
+
+type AnimeDbFranchiseNode = AnimeDetails & {
+	related_anime?: AnimeDbFranchiseRelatedEdge[];
+};
+
+type AnimeDbFranchiseResponse = {
+	source: 'db';
+	data: {
+		seedId: number;
+		stopTypes: string[];
+		maxNodes: number;
+		limited: boolean;
+		count: number;
+		nodes: AnimeDbFranchiseNode[];
+	};
+};
+
 type CachedAnimeData = {
 	username: string;
 	loadedUsername: string;
@@ -280,6 +303,11 @@ class AnimeDataStore {
 
 		this.franchiseSeedId = seedId;
 		this.addAcceptedId(seedId);
+
+		const loadedFromDb = await this.loadFranchiseFromDb(seedId, runId);
+
+		if (loadedFromDb) return;
+
 		this.enqueueFranchiseAnime(seedId);
 
 		await this.crawlFranchiseQueue(runId);
@@ -296,6 +324,12 @@ class AnimeDataStore {
 		this.franchiseRejectedIds = this.franchiseRejectedIds.filter((id) => id !== animeId);
 		this.removePendingCandidate(animeId);
 		this.addAcceptedId(animeId);
+
+		const loadedFromDb = await this.loadFranchiseFromDb(animeId, runId);
+
+		if (loadedFromDb) return;
+
+		this.forceMalFranchiseFetch(animeId);
 		this.enqueueFranchiseAnime(animeId);
 
 		await this.crawlFranchiseQueue(runId);
@@ -318,6 +352,12 @@ class AnimeDataStore {
 			relationType: candidate.relationType,
 			relationLabel: candidate.relationLabel
 		});
+
+		const loadedFromDb = await this.loadFranchiseFromDb(animeId, runId);
+
+		if (loadedFromDb) return;
+
+		this.forceMalFranchiseFetch(animeId);
 		this.enqueueFranchiseAnime(animeId);
 
 		await this.crawlFranchiseQueue(runId);
@@ -376,6 +416,65 @@ class AnimeDataStore {
 		this.franchiseError = null;
 	}
 
+	private forceMalFranchiseFetch(animeId: number) {
+		this.franchiseVisitedIds = this.franchiseVisitedIds.filter((id) => id !== animeId);
+
+		const animeById = { ...this.franchiseAnimeById };
+		delete animeById[animeId];
+
+		this.franchiseAnimeById = animeById;
+	}
+
+	private async loadFranchiseFromDb(seedId: number, runId: number) {
+		if (runId !== this.franchiseRunId) return false;
+
+		try {
+			this.franchiseCrawling = true;
+			this.franchiseError = null;
+			this.franchiseStopRequested = false;
+
+			const response = await fetch(`/api/mal/anime/franchise/${seedId}`);
+
+			if (!response.ok) return false;
+
+			const result = (await response.json()) as AnimeDbFranchiseResponse;
+			const nodes = result.data.nodes;
+
+			if (nodes.length === 0) return false;
+			if (runId !== this.franchiseRunId || this.franchiseStopRequested) return false;
+
+			const animeById = { ...this.franchiseAnimeById };
+
+			for (const node of nodes) {
+				animeById[node.id] = node;
+			}
+
+			this.franchiseAnimeById = animeById;
+
+			for (const node of nodes) {
+				this.addVisitedId(node.id);
+			}
+
+			this.addAcceptedId(seedId);
+
+			for (const node of nodes) {
+				for (const relation of node.related_anime ?? []) {
+					this.processDbFranchiseRelation(node.id, relation);
+				}
+			}
+
+			this.franchiseQueue = [];
+
+			return true;
+		} catch {
+			return false;
+		} finally {
+			if (runId === this.franchiseRunId) {
+				this.franchiseCrawling = false;
+			}
+		}
+	}
+
 	private async crawlFranchiseQueue(runId: number) {
 		if (this.franchiseCrawling) return;
 
@@ -428,6 +527,46 @@ class AnimeDataStore {
 
 			this.processFranchiseRelation(details.id, relation);
 		}
+	}
+
+	private processDbFranchiseRelation(fromNodeId: number, relation: AnimeDbFranchiseRelatedEdge) {
+		const relationType = relation.relation_type;
+		const relationLabel = relation.relation_type_formatted || relationType;
+
+		const fromId = relation.from_id ?? fromNodeId;
+		const toId = relation.to_id ?? relation.node.id;
+
+		const neighborId = fromId === fromNodeId ? toId : fromId;
+		const neighbor = this.franchiseAnimeById[neighborId] ?? relation.node;
+
+		if (this.franchiseRejectedIds.includes(neighborId)) return;
+
+		this.addFranchiseRelation({
+			fromId,
+			toId,
+			relationType,
+			relationLabel
+		});
+
+		if (relation.stopped) {
+			if (!this.franchiseAcceptedIds.includes(neighborId)) {
+				this.addPendingCandidate({
+					animeId: neighborId,
+					fromId,
+					title: neighbor.title,
+					imageUrl: neighbor.main_picture?.medium ?? neighbor.main_picture?.large ?? null,
+					relationType,
+					relationLabel
+				});
+			}
+
+			return;
+		}
+
+		this.addAcceptedId(fromId);
+		this.addAcceptedId(toId);
+		this.removePendingCandidate(fromId);
+		this.removePendingCandidate(toId);
 	}
 
 	private processFranchiseRelation(fromId: number, relation: RelatedAnimeEdge) {

@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { fetchAnimeDetails } from '$lib/server/mal';
+import { tryFetchAnimeDbFranchise } from '$lib/server/anime-db';
 
 export const GET: RequestHandler = async ({ params, fetch }) => {
 	const animeId = Number(params.id);
@@ -9,10 +9,14 @@ export const GET: RequestHandler = async ({ params, fetch }) => {
 		error(400, 'Invalid anime id');
 	}
 
-	const data = await fetchAnimeDetails(fetch, animeId);
+	const result = await tryFetchAnimeDbFranchise(fetch, animeId);
+
+	if (!result) {
+		error(503, 'Anime DB franchise unavailable');
+	}
 
 	return json({
-		data,
-		source: 'mal'
+		...result,
+		source: 'db'
 	});
 };
