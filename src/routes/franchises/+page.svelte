@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FranchiseGraph from '$lib/components/franchise/FranchiseGraph.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import StatCard from '$lib/components/ui/StatCard.svelte';
@@ -9,6 +10,7 @@
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { AnimeDetails, AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
 	import {
+		compareAnimeRelease,
 		formatProgress,
 		formatSeason,
 		getAnimeUrl,
@@ -30,6 +32,8 @@
 	let showSearch = $state(false);
 	let showMalScore = $state(true);
 	let autoAccept = $state(false);
+	let franchiseView = $state<'list' | 'graph'>('list');
+	let pendingCollapsed = $state(false);
 
 	const autoAcceptingAnimeIds = new Set<number>();
 
@@ -41,11 +45,9 @@
 
 			autoAcceptingAnimeIds.add(candidate.animeId);
 
-			void animeData
-				.acceptFranchiseCandidate(candidate.animeId)
-				.finally(() => {
-					autoAcceptingAnimeIds.delete(candidate.animeId);
-				});
+			void animeData.acceptFranchiseCandidate(candidate.animeId).finally(() => {
+				autoAcceptingAnimeIds.delete(candidate.animeId);
+			});
 		}
 	});
 
@@ -108,6 +110,19 @@
 	});
 
 	const shouldShowSearch = $derived(!animeData.hasFranchise || showSearch);
+
+	const franchisePendingIds = $derived.by(() => {
+		return animeData.franchisePendingCandidates.map((candidate) => candidate.animeId);
+	});
+
+	const franchiseGraphAnimeList = $derived.by(() => {
+		const ids = new Set<number>([...animeData.franchiseAcceptedIds, ...franchisePendingIds]);
+
+		return [...ids]
+			.map((id) => animeData.franchiseAnimeById[id])
+			.filter((anime): anime is AnimeDetails => Boolean(anime))
+			.sort((a, b) => compareAnimeRelease({ node: a }, { node: b }));
+	});
 
 	const franchiseStats = $derived.by<Stat[]>(() => {
 		const entries = animeData.franchiseAnimeList;
@@ -193,6 +208,7 @@
 	function startNewSearch() {
 		animeData.clearFranchise();
 		showSearch = true;
+		franchiseView = 'list';
 	}
 
 	function getUserEntry(animeId: number) {
@@ -305,9 +321,9 @@
 				<form
 					class="flex min-w-0 flex-wrap items-center gap-2"
 					onsubmit={(event) => {
-				event.preventDefault();
-				submitSearch();
-			}}
+						event.preventDefault();
+						submitSearch();
+					}}
 				>
 					<Input
 						bind:value={animeData.franchiseQuery}
@@ -342,10 +358,31 @@
 				</div>
 			{/if}
 
-			<div class="ml-auto flex items-center gap-3">
+			<div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+				{#if animeData.hasFranchise}
+					<div class="flex items-center gap-1">
+						<Button
+							type="button"
+							variant={franchiseView === 'list' ? 'primary' : 'default'}
+							onclick={() => (franchiseView = 'list')}
+						>
+							List
+						</Button>
+
+						<Button
+							type="button"
+							variant={franchiseView === 'graph' ? 'primary' : 'default'}
+							onclick={() => (franchiseView = 'graph')}
+						>
+							Graph
+						</Button>
+					</div>
+				{/if}
+
 				<Toggle bind:checked={autoAccept} label="Auto accept" />
 				<Toggle bind:checked={showMalScore} label="MAL score" />
-			</div>		</div>
+			</div>
+		</div>
 	</Panel>
 
 	{#if shouldShowSearch && animeData.franchiseSearchResults.length > 0}
@@ -389,7 +426,11 @@
 	{/if}
 
 	{#if animeData.franchisePendingList.length > 0}
-		<Panel title="Pending relations">
+		<Panel
+			title={`Pending relations (${animeData.franchisePendingList.length})`}
+			collapsible
+			bind:collapsed={pendingCollapsed}
+		>
 			<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
 				{#each animeData.franchisePendingList as candidate (candidate.animeId)}
 					<div class="rounded-md border border-border bg-surface p-2">
@@ -449,70 +490,81 @@
 	{/if}
 
 	{#if animeData.hasFranchise}
-		<Table
-			items={animeData.franchiseAnimeList}
-			{columns}
-			filterText={getFilterText}
-			filterPlaceholder="Filter franchise..."
-		>
-			{#snippet children(anime, index)}
-				<tr class="transition hover:bg-surface-soft">
-					<td class="w-12 px-3 py-2 text-left font-mono text-xs text-text-muted">
-						{index + 1}
-					</td>
-
-					<td class="w-96 max-w-96 px-3 py-2">
-						<div class="flex min-w-0 items-center gap-3">
-							{#if getImageUrl(anime)}
-								<img
-									src={getImageUrl(anime)}
-									alt={anime.title}
-									class="size-9 shrink-0 rounded-md object-cover"
-								/>
-							{:else}
-								<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
-							{/if}
-
-							<div class="min-w-0">
-								<div class="flex min-w-0 items-center gap-2">
-									<a
-										href={getAnimeUrl(anime.id)}
-										target="_blank"
-										rel="noreferrer"
-										class="block max-w-72 truncate font-medium text-text hover:text-primary"
-									>
-										{anime.title}
-									</a>
-								</div>
-
-								<span class="block text-xs text-text-muted">
-									<StatusBadge class="mr-1" status={getUserStatus(anime.id)} />
-									{getSubtitle(anime)}
-								</span>
-							</div>
-						</div>
-					</td>
-
-					<td class="px-3 py-2 text-center font-medium text-primary">
-						{getDisplayScore(anime.id)}
-					</td>
-
-					<td class="px-3 py-2 text-center text-text-soft">
-						{getDisplayProgress(anime.id)}
-					</td>
-
-					<td class="px-3 py-2 text-center text-text-soft">
-						{anime.num_episodes || '?'}
-					</td>
-
-					{#if showMalScore}
-						<td class="px-3 py-2 text-center text-text-soft">
-							{anime.mean ? formatDecimal(anime.mean, 2) : '-'}
+		{#if franchiseView === 'graph'}
+			<FranchiseGraph
+				animes={franchiseGraphAnimeList}
+				relations={animeData.franchiseRelations}
+				seedId={animeData.franchiseSeedId}
+				pendingIds={franchisePendingIds}
+				getUserStatus={getUserStatus}
+				getSubtitle={getSubtitle}
+			/>
+		{:else}
+			<Table
+				items={animeData.franchiseAnimeList}
+				{columns}
+				filterText={getFilterText}
+				filterPlaceholder="Filter franchise..."
+			>
+				{#snippet children(anime, index)}
+					<tr class="transition hover:bg-surface-soft">
+						<td class="w-12 px-3 py-2 text-left font-mono text-xs text-text-muted">
+							{index + 1}
 						</td>
-					{/if}
-				</tr>
-			{/snippet}
-		</Table>
+
+						<td class="w-96 max-w-96 px-3 py-2">
+							<div class="flex min-w-0 items-center gap-3">
+								{#if getImageUrl(anime)}
+									<img
+										src={getImageUrl(anime)}
+										alt={anime.title}
+										class="size-9 shrink-0 rounded-md object-cover"
+									/>
+								{:else}
+									<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
+								{/if}
+
+								<div class="min-w-0">
+									<div class="flex min-w-0 items-center gap-2">
+										<a
+											href={getAnimeUrl(anime.id)}
+											target="_blank"
+											rel="noreferrer"
+											class="block max-w-72 truncate font-medium text-text hover:text-primary"
+										>
+											{anime.title}
+										</a>
+									</div>
+
+									<span class="block text-xs text-text-muted">
+										<StatusBadge class="mr-1" status={getUserStatus(anime.id)} />
+										{getSubtitle(anime)}
+									</span>
+								</div>
+							</div>
+						</td>
+
+						<td class="px-3 py-2 text-center font-medium text-primary">
+							{getDisplayScore(anime.id)}
+						</td>
+
+						<td class="px-3 py-2 text-center text-text-soft">
+							{getDisplayProgress(anime.id)}
+						</td>
+
+						<td class="px-3 py-2 text-center text-text-soft">
+							{anime.num_episodes || '?'}
+						</td>
+
+						{#if showMalScore}
+							<td class="px-3 py-2 text-center text-text-soft">
+								{anime.mean ? formatDecimal(anime.mean, 2) : '-'}
+							</td>
+						{/if}
+					</tr>
+				{/snippet}
+			</Table>
+		{/if}
 	{:else if !animeData.franchiseSearchResults.length}
 		<Panel>
 			<p class="text-sm text-text-muted">
