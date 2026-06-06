@@ -578,7 +578,7 @@
 								</a>
 
 								<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
-									<StatusBadge status={getUserStatus(anime.id)} />
+									<StatusBadge class="mt-0.5" status={getUserStatus(anime.id)} />
 
 									<span class="truncate">
 										{getSubtitle(anime)}

@@ -537,7 +537,7 @@
 									</div>
 
 									<span class="block text-xs text-text-muted">
-										<StatusBadge class="mr-1" status={getUserStatus(anime.id)} />
+										<StatusBadge class="mr-1 mt-0.5" status={getUserStatus(anime.id)} />
 										{getSubtitle(anime)}
 									</span>
 								</div>
