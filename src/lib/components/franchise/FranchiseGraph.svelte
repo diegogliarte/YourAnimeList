@@ -1,5 +1,6 @@
 <script lang="ts">
-	import dagre from '@dagrejs/dagre';
+	import { graphlib, layout } from '@dagrejs/dagre';
+
 	import {
 		Background,
 		ConnectionLineType,
@@ -209,7 +210,7 @@
 	}
 
 	function getLayoutedElements(rawNodes: Node[], rawEdges: Edge[]) {
-		const graph = new dagre.graphlib.Graph();
+		const graph = new graphlib.Graph();
 
 		graph.setDefaultEdgeLabel(() => ({}));
 		graph.setGraph({
@@ -232,7 +233,7 @@
 			graph.setEdge(edge.source, edge.target);
 		}
 
-		dagre.layout(graph);
+		layout(graph);
 
 		const layoutedNodes = rawNodes.map((node) => {
 			const graphNode = graph.node(node.id);
