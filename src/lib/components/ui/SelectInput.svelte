@@ -33,7 +33,7 @@
 		bind:value
 		{disabled}
 		class="
-			w-full min-w-0 truncate rounded-md border border-border bg-surface px-3 py-1.5
+			w-full min-w-0 truncate rounded-md border border-border bg-surface px-1 py-1.5
 			text-sm text-text outline-none transition
 			hover:border-primary/70 hover:bg-surface-soft
 			focus:border-primary

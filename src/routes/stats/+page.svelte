@@ -366,7 +366,7 @@
 		{
 			label: 'Title',
 			value: (row) => row.entry.node.title,
-			class: 'w-64'
+			class: 'min-w-0 sm:w-64'
 		},
 		{
 			label: 'Eps',
@@ -384,7 +384,7 @@
 		{
 			label: 'Title',
 			value: (row) => row.entry.node.title,
-			class: 'w-64'
+			class: 'min-w-0 sm:w-64'
 		},
 		{
 			label: 'Rewatches',
@@ -508,8 +508,8 @@
 	});
 </script>
 
-<div class="grid gap-2">
-	<Panel class="flex flex-col gap-2">
+<div class="grid min-w-0 gap-2">
+	<Panel class="flex min-w-0 flex-col gap-2">
 		{#if animeData.userListLoading}
 			<p class="text-sm text-text-muted">Loading...</p>
 		{:else if animeData.userListError}
@@ -517,66 +517,86 @@
 		{:else if !animeData.hasUserList}
 			<p class="text-sm text-text-muted">Load a MAL username from the navbar first.</p>
 		{:else}
-			<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+			<div class="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
 				{#each stats as stat (stat.label)}
-					<StatCard label={stat.label} value={stat.value} hint={stat.hint} />
+					<div class="min-w-0">
+						<StatCard label={stat.label} value={stat.value} hint={stat.hint} />
+					</div>
 				{/each}
 			</div>
 
-			<div class="grid gap-2 lg:grid-cols-2">
+			<div class="grid min-w-0 gap-2 lg:grid-cols-2">
 				{#each charts as chart (chart.title)}
-					<AnimeBarChart title={chart.title} data={chart.data} maxRows={chart.maxRows} />
+					<div class="min-w-0">
+						<AnimeBarChart title={chart.title} data={chart.data} maxRows={chart.maxRows} />
+					</div>
 				{/each}
 			</div>
 
-			<div class="grid gap-2 lg:grid-cols-2">
-				<AnimeBreakdownTable title="Genre breakdown" rows={genreBreakdown} maxRows={10} />
+			<div class="grid min-w-0 gap-2 lg:grid-cols-2">
+				<div class="min-w-0">
+					<AnimeBreakdownTable title="Genre breakdown" rows={genreBreakdown} maxRows={10} />
+				</div>
 
-				<AnimeBreakdownTable title="Studio breakdown" rows={studioBreakdown} maxRows={10} />
+				<div class="min-w-0">
+					<AnimeBreakdownTable title="Studio breakdown" rows={studioBreakdown} maxRows={10} />
+				</div>
 			</div>
 
-			<div class="grid gap-2 lg:grid-cols-2">
-				<AnimeLeaderboard
-					title="Longest completed runtime"
-					rows={longestCompletedRuntime}
-					columns={longestCompletedRuntimeColumns}
-					getHref={(row) => getAnimeUrl(row.entry.node.id)}
-				/>
+			<div class="grid min-w-0 gap-2 lg:grid-cols-2">
+				<div class="min-w-0">
+					<AnimeLeaderboard
+						title="Longest completed runtime"
+						rows={longestCompletedRuntime}
+						columns={longestCompletedRuntimeColumns}
+						getHref={(row) => getAnimeUrl(row.entry.node.id)}
+					/>
+				</div>
 
-				<AnimeLeaderboard
-					title="Top rewatches"
-					rows={topRewatches}
-					columns={topRewatchColumns}
-					getHref={(row) => getAnimeUrl(row.entry.node.id)}
-				/>
+				<div class="min-w-0">
+					<AnimeLeaderboard
+						title="Top rewatches"
+						rows={topRewatches}
+						columns={topRewatchColumns}
+						getHref={(row) => getAnimeUrl(row.entry.node.id)}
+					/>
+				</div>
 			</div>
 
-			<div class="grid gap-2 lg:grid-cols-2">
-				<AnimeShowcase
-					title="Hidden gems"
-					description="Completed anime you rated 8+, with MAL mean below 7.9."
-					items={hiddenGems}
-				/>
+			<div class="grid min-w-0 gap-2 lg:grid-cols-2">
+				<div class="min-w-0">
+					<AnimeShowcase
+						title="Hidden gems"
+						description="Completed anime you rated 8+, with MAL mean below 7.9."
+						items={hiddenGems}
+					/>
+				</div>
 
-				<AnimeShowcase
-					title="Hot takes"
-					description="MAL mean is 8.0+, but your score is lower."
-					items={hotTakes}
-				/>
+				<div class="min-w-0">
+					<AnimeShowcase
+						title="Hot takes"
+						description="MAL mean is 8.0+, but your score is lower."
+						items={hotTakes}
+					/>
+				</div>
 
-				<AnimeShowcase
-					title="Most obscure"
-					description="Completed anime you rated 8+, sorted by popularity rank."
-					items={mostObscure}
-					metric="popularity"
-				/>
+				<div class="min-w-0">
+					<AnimeShowcase
+						title="Most obscure"
+						description="Completed anime you rated 8+, sorted by popularity rank."
+						items={mostObscure}
+						metric="popularity"
+					/>
+				</div>
 
-				<AnimeShowcase
-					title="Popular misses"
-					description="Popular completed anime you scored 6 or lower."
-					items={popularMisses}
-					metric="popularity"
-				/>
+				<div class="min-w-0">
+					<AnimeShowcase
+						title="Popular misses"
+						description="Popular completed anime you scored 6 or lower."
+						items={popularMisses}
+						metric="popularity"
+					/>
+				</div>
 			</div>
 		{/if}
 	</Panel>

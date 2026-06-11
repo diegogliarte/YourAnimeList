@@ -14,13 +14,23 @@
 		AnimeDbFilters,
 		AnimeDbNamedFacetItem
 	} from '$lib/types/anime-db';
-	import {
-		formatLabel,
-		formatNumber
-	} from '$lib/utils/format.utils';
+	import { formatLabel, formatNumber } from '$lib/utils/format.utils';
+	import MultiSelect from '$lib/components/ui/MultiSelect.svelte';
 
 	const PAGE_SIZE = 50;
 	const FILTER_DEBOUNCE_MS = 350;
+
+	const seasonOptions: SelectOption[] = [
+		{ value: 'winter', label: 'Winter' },
+		{ value: 'spring', label: 'Spring' },
+		{ value: 'summer', label: 'Summer' },
+		{ value: 'fall', label: 'Fall' }
+	];
+
+	const relationModeOptions: SelectOption[] = [
+		{ value: 'all', label: 'Match all' },
+		{ value: 'any', label: 'Match any' }
+	];
 
 	let items = $state<AnimeDbEntry[]>([]);
 	let facets = $state<AnimeDbFacetsResponse | null>(null);
@@ -41,15 +51,29 @@
 	let source = $state('');
 	let rating = $state('');
 	let nsfw = $state('');
-	let genreId = $state('');
-	let studioId = $state('');
+
+	let genreIds = $state<string[]>([]);
+	let genreMode = $state<'any' | 'all'>('all');
+
+	let studioIds = $state<string[]>([]);
+	let studioMode = $state<'any' | 'all'>('any');
+
+	let season = $state('');
 
 	let yearMin = $state('');
 	let yearMax = $state('');
-	let meanMin = $state('');
-	let meanMax = $state('');
+
+	let malScoreMin = $state('');
+	let malScoreMax = $state('');
+
+	let popularityMin = $state('');
+	let popularityMax = $state('');
+
 	let episodesMin = $state('');
 	let episodesMax = $state('');
+
+	let usersMin = $state('');
+	let usersMax = $state('');
 
 	let sentinel = $state<HTMLDivElement | null>(null);
 
@@ -67,14 +91,21 @@
 			source,
 			rating,
 			nsfw,
-			genreId,
-			studioId,
+			genreIds,
+			genreMode,
+			studioIds,
+			studioMode,
+			season,
 			yearMin,
 			yearMax,
-			meanMin,
-			meanMax,
+			malScoreMin,
+			malScoreMax,
+			popularityMin,
+			popularityMax,
 			episodesMin,
-			episodesMax
+			episodesMax,
+			usersMin,
+			usersMax
 		})
 	);
 
@@ -223,15 +254,29 @@
 		source = '';
 		rating = '';
 		nsfw = '';
-		genreId = '';
-		studioId = '';
+
+		genreIds = [];
+		genreMode = 'all';
+
+		studioIds = [];
+		studioMode = 'any';
+
+		season = '';
 
 		yearMin = '';
 		yearMax = '';
-		meanMin = '';
-		meanMax = '';
+
+		malScoreMin = '';
+		malScoreMax = '';
+
+		popularityMin = '';
+		popularityMax = '';
+
 		episodesMin = '';
 		episodesMax = '';
+
+		usersMin = '';
+		usersMax = '';
 	}
 
 	function getFilters(offset: number): AnimeDbFilters {
@@ -247,17 +292,28 @@
 			rating,
 			nsfw,
 
-			genre_id: genreId,
-			studio_id: studioId,
+			genre_ids: genreIds.join(','),
+			genre_mode: genreMode,
+
+			studio_ids: studioIds.join(','),
+			studio_mode: studioMode,
+
+			season,
 
 			year_min: yearMin,
 			year_max: yearMax,
 
-			mean_min: meanMin,
-			mean_max: meanMax,
+			mal_score_min: malScoreMin,
+			mal_score_max: malScoreMax,
+
+			popularity_min: popularityMin,
+			popularity_max: popularityMax,
 
 			episodes_min: episodesMin,
-			episodes_max: episodesMax
+			episodes_max: episodesMax,
+
+			users_min: usersMin,
+			users_max: usersMax
 		};
 	}
 
@@ -283,6 +339,20 @@
 	}
 
 	function formatFacetLabel(value: string) {
+		if (value === 'oldest_first') return 'Oldest first';
+		if (value === 'newest_first') return 'Newest first';
+		if (value === 'lowest_mal_score') return 'Lowest MAL score';
+		if (value === 'highest_mal_score') return 'Highest MAL score';
+		if (value === 'most_popular') return 'Most popular';
+		if (value === 'least_popular') return 'Least popular';
+		if (value === 'most_favorites') return 'Most favorites';
+		if (value === 'most_listed') return 'Most listed';
+		if (value === 'most_episodes') return 'Most episodes';
+		if (value === 'fewest_episodes') return 'Fewest episodes';
+		if (value === 'longest_runtime') return 'Longest runtime';
+		if (value === 'shortest_runtime') return 'Shortest runtime';
+		if (value === 'title_asc') return 'Title';
+
 		return formatLabel(value);
 	}
 </script>
@@ -322,13 +392,72 @@
 				<SelectInput label="Media" bind:value={mediaType} options={mediaTypeOptions} />
 				<SelectInput label="Status" bind:value={status} options={statusOptions} />
 				<SelectInput label="Source" bind:value={source} options={sourceOptions} />
-				<SelectInput label="Genre" bind:value={genreId} options={genreOptions} />
-				<SelectInput label="Studio" bind:value={studioId} options={studioOptions} />
+				<SelectInput label="Season" bind:value={season} options={seasonOptions} />
 				<SelectInput label="Rating" bind:value={rating} options={ratingOptions} />
 				<SelectInput label="NSFW" bind:value={nsfw} options={nsfwOptions} />
 			</div>
 
-			<div class="grid min-w-0 gap-2 sm:grid-cols-3">
+			<div class="grid min-w-0 gap-2 lg:grid-cols-2">
+				<div class="grid min-w-0 gap-2 rounded-md border border-border bg-surface-soft/40 p-2">
+					<div class="flex min-w-0 items-center justify-between gap-2">
+						<div class="min-w-0">
+							<p class="truncate text-xs font-medium text-text">Genres</p>
+							<p class="truncate text-[11px] text-text-muted">
+								Select one or more genres to narrow the DB.
+							</p>
+						</div>
+
+						{#if genreIds.length > 0}
+				<span class="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
+					{genreIds.length}
+				</span>
+						{/if}
+					</div>
+
+					<div class="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_8rem]">
+						<MultiSelect
+							label="Genre filter"
+							bind:value={genreIds}
+							options={genreOptions}
+							placeholder="Any genre"
+							searchPlaceholder="Search genres..."
+						/>
+
+						<SelectInput label="Mode" bind:value={genreMode} options={relationModeOptions} />
+					</div>
+				</div>
+
+				<div class="grid min-w-0 gap-2 rounded-md border border-border bg-surface-soft/40 p-2">
+					<div class="flex min-w-0 items-center justify-between gap-2">
+						<div class="min-w-0">
+							<p class="truncate text-xs font-medium text-text">Studios</p>
+							<p class="truncate text-[11px] text-text-muted">
+								Filter by one or more production studios.
+							</p>
+						</div>
+
+						{#if studioIds.length > 0}
+				<span class="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
+					{studioIds.length}
+				</span>
+						{/if}
+					</div>
+
+					<div class="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_8rem]">
+						<MultiSelect
+							label="Studio filter"
+							bind:value={studioIds}
+							options={studioOptions}
+							placeholder="Any studio"
+							searchPlaceholder="Search studios..."
+						/>
+
+						<SelectInput label="Mode" bind:value={studioMode} options={relationModeOptions} />
+					</div>
+				</div>
+			</div>
+
+			<div class="grid min-w-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
 				<div class="grid min-w-0 grid-cols-2 gap-2">
 					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
 						<span>Year min</span>
@@ -353,9 +482,9 @@
 
 				<div class="grid min-w-0 grid-cols-2 gap-2">
 					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
-						<span>Mean min</span>
+						<span>MAL score min</span>
 						<Input
-							bind:value={meanMin}
+							bind:value={malScoreMin}
 							type="number"
 							step="0.1"
 							placeholder="0"
@@ -364,12 +493,34 @@
 					</label>
 
 					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
-						<span>Mean max</span>
+						<span>MAL score max</span>
 						<Input
-							bind:value={meanMax}
+							bind:value={malScoreMax}
 							type="number"
 							step="0.1"
 							placeholder="10"
+							class="w-full min-w-0"
+						/>
+					</label>
+				</div>
+
+				<div class="grid min-w-0 grid-cols-2 gap-2">
+					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
+						<span>Popularity min</span>
+						<Input
+							bind:value={popularityMin}
+							type="number"
+							placeholder="1"
+							class="w-full min-w-0"
+						/>
+					</label>
+
+					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
+						<span>Popularity max</span>
+						<Input
+							bind:value={popularityMax}
+							type="number"
+							placeholder="10000"
 							class="w-full min-w-0"
 						/>
 					</label>
@@ -392,6 +543,28 @@
 							bind:value={episodesMax}
 							type="number"
 							placeholder={facets?.ranges.maxEpisodes ? String(facets.ranges.maxEpisodes) : ''}
+							class="w-full min-w-0"
+						/>
+					</label>
+				</div>
+
+				<div class="grid min-w-0 grid-cols-2 gap-2">
+					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
+						<span>List users min</span>
+						<Input
+							bind:value={usersMin}
+							type="number"
+							placeholder="0"
+							class="w-full min-w-0"
+						/>
+					</label>
+
+					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
+						<span>List users max</span>
+						<Input
+							bind:value={usersMax}
+							type="number"
+							placeholder="1000000"
 							class="w-full min-w-0"
 						/>
 					</label>

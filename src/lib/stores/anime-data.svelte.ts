@@ -149,7 +149,7 @@ class AnimeDataStore {
 		this.userListError = null;
 
 		try {
-			const response = await fetch(`/api/mal/users/${encodeURIComponent(cleanUsername)}/animelist`);
+			const response = await fetch(`/api/mal/users/${encodeURIComponent(cleanUsername)}/animelist`, {cache: 'no-store'});
 
 			if (!response.ok) {
 				const message = await response.text();
