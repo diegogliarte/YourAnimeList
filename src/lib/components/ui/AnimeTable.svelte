@@ -734,7 +734,7 @@
 		</div>
 	{/if}
 
-	<div class="min-w-0 max-w-full overflow-x-scroll overscroll-x-contain [scrollbar-gutter:stable]">
+	<div class="min-w-0 max-w-full overflow-x-auto">
 		<table
 			class="table-fixed border-collapse text-sm"
 			style:width={tableWidth}
