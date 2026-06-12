@@ -31,7 +31,7 @@
 	}
 </script>
 
-<header class="border-b border-border bg-background/80 backdrop-blur">
+<header class="shrink-0 border-b border-border bg-background/80 backdrop-blur">
 	<nav
 		class="
 			mx-auto grid max-w-7xl grid-cols-[auto_1fr] items-center gap-x-3 gap-y-2 px-3 py-2
@@ -68,7 +68,7 @@
 
 		<div
 			class="
-				col-span-2 row-start-2 flex justify-center gap-1.5 overflow-x-auto pb-0.5
+				col-span-2 row-start-2 flex min-w-0 justify-center gap-1.5 overflow-x-auto pb-0.5
 				lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:overflow-visible lg:pb-0
 			"
 		>

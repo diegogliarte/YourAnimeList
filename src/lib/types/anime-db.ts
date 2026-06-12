@@ -113,14 +113,18 @@ export type AnimeDbFilters = {
 	rating?: string;
 	nsfw?: string;
 
-	genre_id?: string;
-	studio_id?: string;
+	genre_ids?: string;
+	genre_mode?: string;
+	studio_ids?: string;
+	studio_mode?: string;
+
+	season?: string;
 
 	year_min?: string;
 	year_max?: string;
 
-	mean_min?: string;
-	mean_max?: string;
+	mal_score_min?: string;
+	mal_score_max?: string;
 
 	rank_min?: string;
 	rank_max?: string;

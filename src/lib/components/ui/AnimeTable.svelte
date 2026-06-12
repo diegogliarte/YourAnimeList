@@ -44,6 +44,7 @@
 </script>
 
 <script lang="ts">
+	import { onMount, tick } from 'svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
@@ -56,7 +57,6 @@
 		getSeasonValue
 	} from '$lib/utils/anime.utils';
 	import { formatDecimal, formatDuration, formatLabel, formatNumber } from '$lib/utils/format.utils';
-	import Panel from '$lib/components/ui/Panel.svelte';
 
 	type Props = {
 		items: AnimeTableAnime[];
@@ -66,30 +66,7 @@
 		class?: string;
 	};
 
-	let {
-		items,
-		filterPlaceholder = 'Filter anime...',
-		showFilter = true,
-		showColumnControls = true,
-		class: className = ''
-	}: Props = $props();
-
-	let query = $state('');
-	let selectedSort = $state<ColumnValue | null>(null);
-	let direction = $state<SortDirection | null>(null);
-	let hiddenColumns = $state<ColumnValue[]>([]);
-	let configuredColumns = $state<ColumnValue[]>([]);
-	let filtersCollapsed = $state(true);
-
-	const defaultVisibleColumns: ColumnValue[] = [
-		'rank',
-		'title',
-		'score',
-		'mal_score',
-		'episodes',
-		'season',
-		'total_duration'
-	];
+	const STORAGE_KEY = 'your-anime-list:anime-table:hidden-columns';
 
 	const columns: Column[] = [
 		{ label: '#', value: 'rank', width: '1rem' },
@@ -110,6 +87,29 @@
 		{ label: 'Total Time', value: 'total_duration', align: 'center', width: '7rem' },
 		{ label: 'Start', value: 'start_date', align: 'center', width: '7rem' }
 	];
+
+	const defaultVisibleColumns: ColumnValue[] = [
+		'rank',
+		'title',
+		'score',
+		'mal_score',
+		'episodes',
+		'season',
+		'total_duration'
+	];
+
+	let {
+		items,
+		filterPlaceholder = 'Filter anime...',
+		showFilter = true,
+		showColumnControls = true,
+		class: className = ''
+	}: Props = $props();
+
+	let query = $state('');
+	let selectedSort = $state<ColumnValue | null>(null);
+	let direction = $state<SortDirection | null>(null);
+	let hiddenColumns = $state<ColumnValue[]>(getDefaultHiddenColumns());
 
 	const userEntryByAnimeId = $derived.by(() => {
 		const entries = new Map<number, UserAnimeListEdge>();
@@ -154,19 +154,13 @@
 	});
 
 	const sortedRows = $derived.by(() => {
-		if (!selectedSort || !direction) {
-			return filteredRows;
-		}
+		if (!selectedSort || !direction) return filteredRows;
 
 		const sortColumnIsVisible = visibleColumns.some((column) => column.value === selectedSort);
 
-		if (!sortColumnIsVisible) {
-			return filteredRows;
-		}
+		if (!sortColumnIsVisible) return filteredRows;
 
-		const sorted = [...filteredRows];
-
-		sorted.sort((a, b) => {
+		return [...filteredRows].sort((a, b) => {
 			const result = compareValues(
 				getSortValue(a.item, selectedSort, a.originalIndex),
 				getSortValue(b.item, selectedSort, b.originalIndex)
@@ -174,45 +168,10 @@
 
 			return direction === 'desc' ? -result : result;
 		});
-
-		return sorted;
 	});
 
-	$effect(() => {
-		const relevantColumnValues = relevantColumns.map((column) => column.value);
-		const relevantColumnValueSet = new Set(relevantColumnValues);
-
-		let nextConfiguredColumns = configuredColumns.filter((value) =>
-			relevantColumnValueSet.has(value)
-		);
-
-		let nextHiddenColumns = hiddenColumns.filter((value) => relevantColumnValueSet.has(value));
-
-		for (const column of relevantColumns) {
-			if (!nextConfiguredColumns.includes(column.value)) {
-				nextConfiguredColumns = [...nextConfiguredColumns, column.value];
-
-				if (
-					column.hideable !== false &&
-					!defaultVisibleColumns.includes(column.value) &&
-					!nextHiddenColumns.includes(column.value)
-				) {
-					nextHiddenColumns = [...nextHiddenColumns, column.value];
-				}
-			}
-
-			if (column.hideable === false && nextHiddenColumns.includes(column.value)) {
-				nextHiddenColumns = nextHiddenColumns.filter((value) => value !== column.value);
-			}
-		}
-
-		if (!arraysEqual(configuredColumns, nextConfiguredColumns)) {
-			configuredColumns = nextConfiguredColumns;
-		}
-
-		if (!arraysEqual(hiddenColumns, nextHiddenColumns)) {
-			hiddenColumns = nextHiddenColumns;
-		}
+	onMount(() => {
+		hiddenColumns = loadHiddenColumns();
 	});
 
 	$effect(() => {
@@ -245,12 +204,52 @@
 	function toggleColumn(column: Column) {
 		if (isColumnDisabled(column)) return;
 
-		if (hiddenColumns.includes(column.value)) {
-			hiddenColumns = hiddenColumns.filter((value) => value !== column.value);
-			return;
-		}
+		hiddenColumns = hiddenColumns.includes(column.value)
+			? hiddenColumns.filter((value) => value !== column.value)
+			: [...hiddenColumns, column.value];
 
-		hiddenColumns = [...hiddenColumns, column.value];
+		saveHiddenColumns();
+	}
+
+	function getDefaultHiddenColumns() {
+		return columns
+			.filter((column) => {
+				if (column.hideable === false) return false;
+
+				return !defaultVisibleColumns.includes(column.value);
+			})
+			.map((column) => column.value);
+	}
+
+	function loadHiddenColumns() {
+		try {
+			const raw = localStorage.getItem(STORAGE_KEY);
+
+			if (!raw) return getDefaultHiddenColumns();
+
+			return sanitizeColumnValues(JSON.parse(raw));
+		} catch {
+			localStorage.removeItem(STORAGE_KEY);
+			return getDefaultHiddenColumns();
+		}
+	}
+
+	function saveHiddenColumns() {
+		try {
+			localStorage.setItem(STORAGE_KEY, JSON.stringify(hiddenColumns));
+		} catch {
+			// Ignore storage failures.
+		}
+	}
+
+	function sanitizeColumnValues(value: unknown) {
+		if (!Array.isArray(value)) return getDefaultHiddenColumns();
+
+		const validColumns = new Set(columns.map((column) => column.value));
+
+		return value.filter((item): item is ColumnValue => {
+			return typeof item === 'string' && validColumns.has(item as ColumnValue);
+		});
 	}
 
 	function isColumnVisible(value: ColumnValue) {
@@ -267,6 +266,7 @@
 		if (selectedSort !== column.value) return '△';
 		if (direction === 'asc') return '△';
 		if (direction === 'desc') return '▽';
+
 		return '△';
 	}
 
@@ -332,15 +332,6 @@
 		return getUserEntry(item)?.list_status?.status ?? null;
 	}
 
-	function getUserStatusText(item: AnimeTableAnime) {
-		const status = getUserStatusName(item);
-
-		if (status) return formatLabel(status);
-		if (animeData.hasUserList && !isUserListEntry(item)) return 'Not in list';
-
-		return null;
-	}
-
 	function getUserScoreText(item: AnimeTableAnime) {
 		return getUserEntry(item)?.list_status?.display_score ?? null;
 	}
@@ -352,17 +343,13 @@
 	function getProgressText(item: AnimeTableAnime) {
 		const userEntry = getUserEntry(item);
 
-		if (!userEntry) return null;
-
-		return formatProgress(userEntry);
+		return userEntry ? formatProgress(userEntry) : null;
 	}
 
 	function getProgressSortValue(item: AnimeTableAnime) {
 		const userEntry = getUserEntry(item);
 
-		if (!userEntry) return null;
-
-		return getProgressValue(userEntry);
+		return userEntry ? getProgressValue(userEntry) : null;
 	}
 
 	function getRelationText(item: AnimeTableAnime) {
@@ -370,7 +357,6 @@
 
 		if (typeof id !== 'number') return null;
 		if (!animeData.hasFranchise) return null;
-
 		if (animeData.franchiseSeedId === id) return 'Seed';
 
 		const relations = animeData.franchiseRelations.filter((relation) => relation.toId === id);
@@ -397,16 +383,24 @@
 		return source ? `from ${source.title}` : null;
 	}
 
-	function getMeanValue(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return item.mean;
+	function getMalScoreValue(item: AnimeTableAnime) {
+		if (isDbEntry(item)) {
+			const dbItem = item as AnimeDbEntry & {
+				mean?: number | null;
+				malScore?: number | null;
+				mal_score?: number | null;
+			};
+
+			return dbItem.malScore ?? dbItem.mal_score ?? dbItem.mean ?? null;
+		}
 
 		return getBaseAnime(item).mean ?? null;
 	}
 
-	function getMeanText(item: AnimeTableAnime) {
-		const mean = getMeanValue(item);
+	function getMalScoreText(item: AnimeTableAnime) {
+		const malScore = getMalScoreValue(item);
 
-		return typeof mean === 'number' ? formatDecimal(mean, 2) : null;
+		return typeof malScore === 'number' ? formatDecimal(malScore, 2) : null;
 	}
 
 	function getEpisodesValue(item: AnimeTableAnime) {
@@ -424,15 +418,15 @@
 	}
 
 	function getPopularityValue(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return item.popularity;
+		const popularity = isDbEntry(item) ? item.popularity : (getBaseAnime(item).popularity ?? null);
 
-		return getBaseAnime(item).popularity ?? null;
+		return typeof popularity === 'number' && popularity > 0 ? popularity : null;
 	}
 
 	function getPopularityText(item: AnimeTableAnime) {
 		const popularity = getPopularityValue(item);
 
-		return typeof popularity === 'number' ? `#${formatNumber(popularity)}` : null;
+		return typeof popularity === 'number' ? `#${formatNumber(popularity)}` : 'No pop';
 	}
 
 	function getMediaTypeRaw(item: AnimeTableAnime) {
@@ -469,7 +463,6 @@
 
 	function getSeasonText(item: AnimeTableAnime) {
 		if (isDbEntry(item)) return formatDbSeason(item);
-
 		if (isNodeAnime(item)) return formatSeason(item);
 
 		return formatSeason({ node: item } as UserAnimeListEdge);
@@ -477,14 +470,20 @@
 
 	function getSeasonSortValue(item: AnimeTableAnime) {
 		if (isDbEntry(item)) return getDbSeasonValue(item);
-
 		if (isNodeAnime(item)) return getSeasonValue(item);
 
 		return getSeasonValue({ node: item } as UserAnimeListEdge);
 	}
 
 	function getAverageEpisodeDurationValue(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return null;
+		if (isDbEntry(item)) {
+			const dbItem = item as AnimeDbEntry & {
+				averageEpisodeDuration?: number | null;
+				average_episode_duration?: number | null;
+			};
+
+			return dbItem.averageEpisodeDuration ?? dbItem.average_episode_duration ?? null;
+		}
 
 		return getBaseAnime(item).average_episode_duration ?? null;
 	}
@@ -496,9 +495,7 @@
 	}
 
 	function getTotalDurationValue(item: AnimeTableAnime) {
-		if (isDbEntry(item)) {
-			return item.totalDuration ?? null;
-		}
+		if (isDbEntry(item)) return item.totalDuration ?? null;
 
 		const episodes = getEpisodesValue(item) ?? 0;
 		const duration = getAverageEpisodeDurationValue(item) ?? 0;
@@ -565,7 +562,7 @@
 		if (value === 'title') return getTitle(item);
 		if (value === 'relation') return getRelationText(item);
 		if (value === 'score') return getUserScoreText(item);
-		if (value === 'mal_score') return getMeanText(item);
+		if (value === 'mal_score') return getMalScoreText(item);
 		if (value === 'progress') return getProgressText(item);
 		if (value === 'episodes') return getEpisodesText(item);
 		if (value === 'season') return getSeasonText(item);
@@ -587,7 +584,7 @@
 		if (value === 'title') return getTitle(item);
 		if (value === 'relation') return getRelationText(item);
 		if (value === 'score') return getUserScoreValue(item);
-		if (value === 'mal_score') return getMeanValue(item);
+		if (value === 'mal_score') return getMalScoreValue(item);
 		if (value === 'progress') return getProgressSortValue(item);
 		if (value === 'episodes') return getEpisodesValue(item);
 		if (value === 'season') return getSeasonSortValue(item);
@@ -688,6 +685,7 @@
 	function alignClass(align: Column['align']) {
 		if (align === 'right') return 'text-right';
 		if (align === 'center') return 'text-center';
+
 		return 'text-left';
 	}
 
@@ -699,49 +697,51 @@
 			.trim();
 	}
 
-	function arraysEqual(a: ColumnValue[], b: ColumnValue[]) {
-		if (a.length !== b.length) return false;
+	const tableWidth = $derived.by(() => {
+		const widths = visibleColumns
+			.map((column) => column.width)
+			.filter((width): width is string => Boolean(width));
 
-		return a.every((value, index) => value === b[index]);
-	}
+		if (widths.length !== visibleColumns.length) {
+			return '100%';
+		}
+
+		return `max(100%, calc(${widths.join(' + ')}))`;
+	});
 </script>
 
-<div class={`overflow-hidden rounded-md border border-border bg-surface ${className}`}>
+<div class={`min-w-0 max-w-full overflow-hidden rounded-md border border-border bg-surface ${className}`}>
 	{#if showFilter || showColumnControls}
-		<div class="grid gap-2 border-b border-border bg-surface p-2">
+		<div class="grid min-w-0 gap-2 border-b border-border bg-surface p-2">
 			{#if showFilter}
-				<Input bind:value={query} placeholder={filterPlaceholder} />
+				<Input bind:value={query} placeholder={filterPlaceholder} class="min-w-0" />
 			{/if}
 
 			{#if showColumnControls}
-				<Panel
-					title="Columns"
-					collapsible
-					bind:collapsed={filtersCollapsed}
-					class="p-2!"
-				>
-					<div class="flex flex-wrap items-center gap-1">
-						<div class="flex flex-wrap gap-1">
-							{#each relevantColumns as column (column.value)}
-								<Checkbox
-									label={column.label}
-									checked={isColumnVisible(column.value)}
-									disabled={isColumnDisabled(column)}
-									onchange={() => toggleColumn(column)}
-								/>
-							{/each}
-						</div>
+				<div class="grid min-w-0 gap-1">
+					<div class="flex min-w-0 flex-wrap gap-1">
+						{#each relevantColumns as column (column.value)}
+							<Checkbox
+								label={column.label}
+								checked={isColumnVisible(column.value)}
+								disabled={isColumnDisabled(column)}
+								onchange={() => toggleColumn(column)}
+							/>
+						{/each}
 					</div>
-				</Panel>
+				</div>
 			{/if}
 		</div>
 	{/if}
 
-	<div class="overflow-x-auto">
-		<table class="w-max min-w-full border-collapse text-sm">
+	<div class="min-w-0 max-w-full overflow-x-scroll overscroll-x-contain [scrollbar-gutter:stable]">
+		<table
+			class="table-fixed border-collapse text-sm"
+			style:width={tableWidth}
+		>
 			<colgroup>
 				{#each visibleColumns as column (column.value)}
-					<col style:width={column.width} style:min-width={column.width} />
+					<col style:width={column.width} />
 				{/each}
 			</colgroup>
 
@@ -795,50 +795,56 @@
 											{/if}
 
 											<div class="min-w-0">
-												<span class="block truncate font-medium">
-													{getTitle(row.item)}
-												</span>
-
-																				{#if getSubtitle(row.item) || getUserStatusName(row.item)}
-													<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
-														{#if getUserStatusName(row.item)}
-															<StatusBadge class="mt-0.5" status={getUserStatusName(row.item)} />
-														{/if}
-
-														{#if getSubtitle(row.item)}
-															<span class="truncate">{getSubtitle(row.item)}</span>
-														{/if}
+													<span class="block truncate font-medium">
+														{getTitle(row.item)}
 													</span>
-																				{/if}
-																			</div>
-																		</a>
-																	{:else}
-																		<div class="flex min-w-0 items-center gap-3">
-																			{#if getImageUrl(row.item)}
-																				<img
-																					src={getImageUrl(row.item)}
-																					alt={getTitle(row.item)}
-																					class="size-9 shrink-0 rounded-md object-cover"
-																				/>
-																			{:else}
-																				<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
-																			{/if}
 
-																			<div class="min-w-0">
-												<span class="block truncate font-medium text-text">
-													{getTitle(row.item)}
-												</span>
+												{#if getSubtitle(row.item) || getUserStatusName(row.item)}
+														<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
+															{#if getUserStatusName(row.item)}
+																<StatusBadge
+																	class="mt-0.5"
+																	status={getUserStatusName(row.item)}
+																/>
+															{/if}
 
-																				{#if getSubtitle(row.item) || getUserStatusName(row.item)}
-													<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
-														{#if getUserStatusName(row.item)}
-															<StatusBadge class="mt-0.5" status={getUserStatusName(row.item)} />
-														{/if}
+															{#if getSubtitle(row.item)}
+																<span class="truncate">{getSubtitle(row.item)}</span>
+															{/if}
+														</span>
+												{/if}
+											</div>
+										</a>
+									{:else}
+										<div class="flex min-w-0 items-center gap-3">
+											{#if getImageUrl(row.item)}
+												<img
+													src={getImageUrl(row.item)}
+													alt={getTitle(row.item)}
+													class="size-9 shrink-0 rounded-md object-cover"
+												/>
+											{:else}
+												<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
+											{/if}
 
-														{#if getSubtitle(row.item)}
-															<span class="truncate">{getSubtitle(row.item)}</span>
-														{/if}
+											<div class="min-w-0">
+													<span class="block truncate font-medium text-text">
+														{getTitle(row.item)}
 													</span>
+
+												{#if getSubtitle(row.item) || getUserStatusName(row.item)}
+														<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
+															{#if getUserStatusName(row.item)}
+																<StatusBadge
+																	class="mt-0.5"
+																	status={getUserStatusName(row.item)}
+																/>
+															{/if}
+
+															{#if getSubtitle(row.item)}
+																<span class="truncate">{getSubtitle(row.item)}</span>
+															{/if}
+														</span>
 												{/if}
 											</div>
 										</div>

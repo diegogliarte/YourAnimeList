@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { browser } from '$app/environment';
 	import { onMount } from 'svelte';
 	import { fetchAnimeDbFacets, fetchAnimeDbPage } from '$lib/api/anime-db.api';
 	import AnimeTable from '$lib/components/ui/AnimeTable.svelte';
@@ -7,6 +6,7 @@
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import SelectInput, { type SelectOption } from '$lib/components/ui/SelectInput.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
+	import MultiSelect from '$lib/components/ui/MultiSelect.svelte';
 	import type {
 		AnimeDbEntry,
 		AnimeDbFacetItem,
@@ -15,7 +15,6 @@
 		AnimeDbNamedFacetItem
 	} from '$lib/types/anime-db';
 	import { formatLabel, formatNumber } from '$lib/utils/format.utils';
-	import MultiSelect from '$lib/components/ui/MultiSelect.svelte';
 
 	const PAGE_SIZE = 50;
 	const FILTER_DEBOUNCE_MS = 350;
@@ -75,8 +74,6 @@
 	let usersMin = $state('');
 	let usersMax = $state('');
 
-	let sentinel = $state<HTMLDivElement | null>(null);
-
 	let hasInitialized = $state(false);
 	let requestId = 0;
 	let lastFilterSignature = '';
@@ -126,25 +123,6 @@
 
 	onMount(() => {
 		void initialize();
-	});
-
-	$effect(() => {
-		if (!browser || !sentinel) return;
-
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries.some((entry) => entry.isIntersecting)) {
-					void loadAnime(false);
-				}
-			},
-			{
-				rootMargin: '700px'
-			}
-		);
-
-		observer.observe(sentinel);
-
-		return () => observer.disconnect();
 	});
 
 	$effect(() => {
@@ -357,7 +335,7 @@
 	}
 </script>
 
-<div class="grid gap-4">
+<div class="grid min-w-0 gap-4">
 	<Panel title="Search DB">
 		<form
 			class="grid min-w-0 gap-3"
@@ -366,9 +344,9 @@
 				submitForm();
 			}}
 		>
-			<div class="flex flex-wrap items-center justify-between gap-2">
+			<div class="flex min-w-0 flex-wrap items-center justify-between gap-2">
 				<div class="flex min-w-0 flex-wrap items-center gap-2">
-					<Input bind:value={query} placeholder="Search anime..." class="w-60" />
+					<Input bind:value={query} placeholder="Search anime..." class="w-60 max-w-full" />
 
 					<Button type="button" onclick={resetFilters} disabled={loading}>
 						Reset
@@ -408,9 +386,9 @@
 						</div>
 
 						{#if genreIds.length > 0}
-				<span class="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
-					{genreIds.length}
-				</span>
+							<span class="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
+								{genreIds.length}
+							</span>
 						{/if}
 					</div>
 
@@ -437,9 +415,9 @@
 						</div>
 
 						{#if studioIds.length > 0}
-				<span class="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
-					{studioIds.length}
-				</span>
+							<span class="shrink-0 rounded-md bg-primary/10 px-2 py-1 text-xs text-primary">
+								{studioIds.length}
+							</span>
 						{/if}
 					</div>
 
@@ -586,17 +564,15 @@
 			<p class="text-sm text-text-muted">Loading anime...</p>
 		</Panel>
 	{:else}
-		<div class="flex items-center justify-between gap-3 text-xs text-text-muted">
+		<div class="flex min-w-0 items-center justify-between gap-3 text-xs text-text-muted">
 			<p>
 				Showing {formatNumber(items.length)} / {formatNumber(total)}
 			</p>
-
-			<p>{sort ? formatFacetLabel(sort) : 'Default sort'}</p>
 		</div>
 
-		<AnimeTable items={items} showFilter={false} />
-
-		<div bind:this={sentinel}></div>
+		<div class="min-w-0">
+			<AnimeTable items={items} showFilter={false} />
+		</div>
 
 		{#if loadingMore}
 			<Panel>
@@ -607,9 +583,7 @@
 				<Button type="button" onclick={() => loadAnime(false)}>Load more</Button>
 			</div>
 		{:else if items.length > 0}
-			<p class="py-3 text-center text-xs text-text-muted">
-				End of the MAL dump.
-			</p>
+			<p class="py-3 text-center text-xs text-text-muted">End of the MAL dump.</p>
 		{:else}
 			<Panel>
 				<p class="text-sm text-text-muted">No anime found.</p>
