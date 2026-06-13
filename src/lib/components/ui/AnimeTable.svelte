@@ -32,7 +32,10 @@
 		| 'nsfw'
 		| 'average_duration'
 		| 'total_duration'
-		| 'start_date';
+		| 'start_date'
+		| 'end_date';
+
+	type CellValue = string | number | null;
 
 	type Column = {
 		label: string;
@@ -41,10 +44,28 @@
 		width?: string;
 		hideable?: boolean;
 	};
+
+	type AnimeRow = {
+		key: string;
+		item: AnimeTableAnime;
+		originalIndex: number;
+		id: number | null;
+		title: string;
+		url: string | null;
+		imageUrl: string | null;
+		subtitle: string;
+		subtitleExtra: string | null;
+		userStatus: AnimeListStatusName | null;
+		hasUserEntry: boolean;
+		relationSource: string | null;
+		rank: number | null;
+		cells: Record<ColumnValue, CellValue>;
+		sorts: Record<ColumnValue, CellValue>;
+	};
 </script>
 
 <script lang="ts">
-	import { onMount, tick } from 'svelte';
+	import { onMount } from 'svelte';
 	import Checkbox from '$lib/components/ui/Checkbox.svelte';
 	import Input from '$lib/components/ui/Input.svelte';
 	import StatusBadge from '$lib/components/ui/StatusBadge.svelte';
@@ -63,6 +84,7 @@
 		filterPlaceholder?: string;
 		showFilter?: boolean;
 		showColumnControls?: boolean;
+		getSubtitleExtra?: (item: AnimeTableAnime) => string | null | undefined;
 		class?: string;
 	};
 
@@ -85,7 +107,8 @@
 		{ label: 'NSFW', value: 'nsfw', align: 'center', width: '5rem' },
 		{ label: 'Avg Ep', value: 'average_duration', align: 'center', width: '6rem' },
 		{ label: 'Total Time', value: 'total_duration', align: 'center', width: '7rem' },
-		{ label: 'Start', value: 'start_date', align: 'center', width: '7rem' }
+		{ label: 'Start Date', value: 'start_date', align: 'center', width: '7rem' },
+		{ label: 'End Date', value: 'end_date', align: 'center', width: '7rem' }
 	];
 
 	const defaultVisibleColumns: ColumnValue[] = [
@@ -103,6 +126,7 @@
 		filterPlaceholder = 'Filter anime...',
 		showFilter = true,
 		showColumnControls = true,
+		getSubtitleExtra,
 		class: className = ''
 	}: Props = $props();
 
@@ -112,62 +136,53 @@
 	let hiddenColumns = $state<ColumnValue[]>(getDefaultHiddenColumns());
 
 	const userEntryByAnimeId = $derived.by(() => {
-		const entries = new Map<number, UserAnimeListEdge>();
+		return new Map(animeData.userList.map((entry) => [entry.node.id, entry]));
+	});
 
-		for (const entry of animeData.userList) {
-			entries.set(entry.node.id, entry);
-		}
-
-		return entries;
+	const rows = $derived.by(() => {
+		return items.map((item, originalIndex) => createRow(item, originalIndex));
 	});
 
 	const relevantColumns = $derived.by(() => {
 		return columns.filter((column) => {
 			if (column.value === 'title') return true;
 
-			return items.some((item) => isColumnRelevant(item, column.value));
+			return rows.some((row) => isRelevant(row, column.value));
 		});
 	});
 
 	const visibleColumns = $derived.by(() => {
 		return relevantColumns.filter((column) => {
-			if (column.hideable === false) return true;
-
-			return !hiddenColumns.includes(column.value);
+			return column.hideable === false || !hiddenColumns.includes(column.value);
 		});
 	});
 
 	const filteredRows = $derived.by(() => {
+		if (!showFilter || !query.trim()) return rows;
+
 		const normalizedQuery = normalize(query);
 
-		return items
-			.map((item, originalIndex) => ({
-				item,
-				originalIndex,
-				key: `${getAnimeId(item)}-${originalIndex}`
-			}))
-			.filter((row) => {
-				if (!showFilter || !normalizedQuery) return true;
-
-				return normalize(getFilterText(row.item)).includes(normalizedQuery);
-			});
+		return rows.filter((row) => normalize(getFilterText(row)).includes(normalizedQuery));
 	});
 
 	const sortedRows = $derived.by(() => {
-		if (!selectedSort || !direction) return filteredRows;
-
-		const sortColumnIsVisible = visibleColumns.some((column) => column.value === selectedSort);
-
-		if (!sortColumnIsVisible) return filteredRows;
+		if (!selectedSort || !direction || !isVisible(selectedSort)) return filteredRows;
 
 		return [...filteredRows].sort((a, b) => {
-			const result = compareValues(
-				getSortValue(a.item, selectedSort, a.originalIndex),
-				getSortValue(b.item, selectedSort, b.originalIndex)
-			);
+			const result = compareValues(a.sorts[selectedSort], b.sorts[selectedSort]);
 
 			return direction === 'desc' ? -result : result;
 		});
+	});
+
+	const tableWidth = $derived.by(() => {
+		const widths = visibleColumns
+			.map((column) => column.width)
+			.filter((width): width is string => Boolean(width));
+
+		return widths.length === visibleColumns.length
+			? `max(100%, calc(${widths.join(' + ')}))`
+			: '100%';
 	});
 
 	onMount(() => {
@@ -175,15 +190,103 @@
 	});
 
 	$effect(() => {
-		if (!selectedSort) return;
-
-		const sortColumnIsVisible = visibleColumns.some((column) => column.value === selectedSort);
-
-		if (!sortColumnIsVisible) {
+		if (selectedSort && !isVisible(selectedSort)) {
 			selectedSort = null;
 			direction = null;
 		}
 	});
+
+	function createRow(item: AnimeTableAnime, originalIndex: number): AnimeRow {
+		const base = getBaseAnime(item);
+		const id = numberOrNull(base.id);
+		const title = String(base.title ?? '-');
+		const userEntry = getUserEntry(item, id);
+		const rank = isRankingEntry(item) ? (item.ranking?.rank ?? null) : null;
+
+		const malScore = getMalScore(item);
+		const episodes = getEpisodes(item);
+		const averageDuration = getAverageEpisodeDuration(item);
+		const totalDuration = getTotalDuration(item, episodes, averageDuration);
+		const popularity = getPopularity(item);
+		const startDate = getStartDate(item);
+		const endDate = getEndDate(item);
+		const seasonText = getSeasonText(item);
+		const seasonSort = getSeasonSortValue(item);
+
+		const subtitle = [
+			label(getMediaType(item)),
+			isDbEntry(item) ? label(item.source) : null,
+			isDbEntry(item) ? label(item.rating) : null,
+			!isDbEntry(item) ? seasonText : null,
+			episodes ? `${formatNumber(episodes)} eps` : null,
+			averageDuration ? `${formatDuration(averageDuration)}/ep` : null,
+			totalDuration ? formatDuration(totalDuration) : null
+		]
+			.filter(Boolean)
+			.join(' · ');
+
+		const subtitleExtra = getSubtitleExtra?.(item) ?? null;
+
+		const cells: Record<ColumnValue, CellValue> = {
+			rank: rank ?? originalIndex + 1,
+			title,
+			relation: getRelationText(id),
+			score: userEntry?.list_status?.display_score ?? null,
+			mal_score: typeof malScore === 'number' ? formatDecimal(malScore, 2) : null,
+			progress: userEntry ? formatProgress(userEntry) : null,
+			episodes: episodes ? formatNumber(episodes) : null,
+			season: seasonText,
+			popularity: popularity ? `#${formatNumber(popularity)}` : null,
+			media_type: label(getMediaType(item)),
+			anime_status: label(getAnimeStatus(item)),
+			source: isDbEntry(item) ? label(item.source) : null,
+			rating: isDbEntry(item) ? label(item.rating) : null,
+			nsfw: isDbEntry(item) ? label(item.nsfw) : null,
+			average_duration: averageDuration ? `${formatDuration(averageDuration)}/ep` : null,
+			total_duration: totalDuration ? formatDuration(totalDuration) : null,
+			start_date: startDate,
+			end_date: endDate
+		};
+
+		const sorts: Record<ColumnValue, CellValue> = {
+			rank: rank ?? originalIndex + 1,
+			title,
+			relation: cells.relation,
+			score: userEntry?.list_status?.sort_score ?? null,
+			mal_score: malScore,
+			progress: userEntry ? getProgressValue(userEntry) : null,
+			episodes,
+			season: seasonSort,
+			popularity,
+			media_type: cells.media_type,
+			anime_status: cells.anime_status,
+			source: cells.source,
+			rating: cells.rating,
+			nsfw: cells.nsfw,
+			average_duration: averageDuration,
+			total_duration: totalDuration,
+			start_date: yearFromDate(startDate),
+			end_date: yearFromDate(endDate)
+		};
+
+		return {
+			key: `${id ?? title}-${originalIndex}`,
+			item,
+			originalIndex,
+			id,
+			title,
+			url: getUrl(item, id),
+			imageUrl: getImageUrl(item),
+			subtitle,
+			subtitleExtra,
+			userStatus: userEntry?.list_status?.status ?? null,
+			hasUserEntry: Boolean(userEntry),
+			relationSource: getRelationSourceText(id),
+			rank,
+			cells,
+			sorts
+		};
+	}
 
 	function toggleSort(column: Column) {
 		if (selectedSort !== column.value) {
@@ -211,13 +314,41 @@
 		saveHiddenColumns();
 	}
 
+	function cell(row: AnimeRow, value: ColumnValue, displayIndex: number) {
+		if (value === 'rank') return row.rank ?? displayIndex + 1;
+
+		return row.cells[value] ?? null;
+	}
+
+	function isRelevant(row: AnimeRow, value: ColumnValue) {
+		if (value === 'relation') {
+			return hasValue(row.cells.relation) || hasValue(row.relationSource);
+		}
+
+		if (value === 'score' || value === 'progress') {
+			return row.hasUserEntry;
+		}
+
+		return hasValue(row.cells[value]);
+	}
+
+	function isVisible(value: ColumnValue) {
+		return visibleColumns.some((column) => column.value === value);
+	}
+
+	function isColumnDisabled(column: Column) {
+		return column.hideable === false || (isVisible(column.value) && visibleColumns.length <= 1);
+	}
+
+	function getFilterText(row: AnimeRow) {
+		return [row.title, row.subtitle, row.subtitleExtra, row.relationSource, ...Object.values(row.cells)]
+			.filter(Boolean)
+			.join(' ');
+	}
+
 	function getDefaultHiddenColumns() {
 		return columns
-			.filter((column) => {
-				if (column.hideable === false) return false;
-
-				return !defaultVisibleColumns.includes(column.value);
-			})
+			.filter((column) => column.hideable !== false && !defaultVisibleColumns.includes(column.value))
 			.map((column) => column.value);
 	}
 
@@ -225,11 +356,10 @@
 		try {
 			const raw = localStorage.getItem(STORAGE_KEY);
 
-			if (!raw) return getDefaultHiddenColumns();
-
-			return sanitizeColumnValues(JSON.parse(raw));
+			return raw ? sanitizeColumnValues(JSON.parse(raw)) : getDefaultHiddenColumns();
 		} catch {
 			localStorage.removeItem(STORAGE_KEY);
+
 			return getDefaultHiddenColumns();
 		}
 	}
@@ -252,24 +382,6 @@
 		});
 	}
 
-	function isColumnVisible(value: ColumnValue) {
-		return visibleColumns.some((column) => column.value === value);
-	}
-
-	function isColumnDisabled(column: Column) {
-		if (column.hideable === false) return true;
-
-		return isColumnVisible(column.value) && visibleColumns.length <= 1;
-	}
-
-	function getSortIcon(column: Column) {
-		if (selectedSort !== column.value) return '△';
-		if (direction === 'asc') return '△';
-		if (direction === 'desc') return '▽';
-
-		return '△';
-	}
-
 	function isNodeAnime(item: AnimeTableAnime): item is UserAnimeListEdge | AnimeRankingEdge {
 		return 'node' in item;
 	}
@@ -286,26 +398,20 @@
 		return 'mainPicture' in item || 'mediaType' in item || 'numEpisodes' in item;
 	}
 
-	function getBaseAnime(item: AnimeTableAnime): Record<string, any> {
-		if (isNodeAnime(item)) return item.node as Record<string, any>;
-
-		return item as Record<string, any>;
+	function getBaseAnime(item: AnimeTableAnime) {
+		return (isNodeAnime(item) ? item.node : item) as Record<string, unknown>;
 	}
 
-	function getAnimeId(item: AnimeTableAnime) {
-		return getBaseAnime(item).id;
+	function getUserEntry(item: AnimeTableAnime, id: number | null) {
+		if (isUserListEntry(item)) return item;
+
+		return id ? userEntryByAnimeId.get(id) : undefined;
 	}
 
-	function getTitle(item: AnimeTableAnime) {
-		return String(getBaseAnime(item).title ?? '-');
-	}
+	function getUrl(item: AnimeTableAnime, id: number | null) {
+		if (isDbEntry(item)) return item.malUrl ?? null;
 
-	function getUrl(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return item.malUrl;
-
-		const id = getAnimeId(item);
-
-		return typeof id === 'number' ? getAnimeUrl(id) : null;
+		return id ? getAnimeUrl(id) : null;
 	}
 
 	function getImageUrl(item: AnimeTableAnime) {
@@ -313,77 +419,37 @@
 			return item.mainPicture?.medium ?? item.mainPicture?.large ?? null;
 		}
 
-		const anime = getBaseAnime(item);
+		const picture = getBaseAnime(item).main_picture as
+			| { medium?: string; large?: string }
+			| undefined;
 
-		return anime.main_picture?.medium ?? anime.main_picture?.large ?? null;
+		return picture?.medium ?? picture?.large ?? null;
 	}
 
-	function getUserEntry(item: AnimeTableAnime) {
-		if (isUserListEntry(item)) return item;
-
-		const id = getAnimeId(item);
-
-		if (typeof id !== 'number') return undefined;
-
-		return userEntryByAnimeId.get(id);
-	}
-
-	function getUserStatusName(item: AnimeTableAnime): AnimeListStatusName | null {
-		return getUserEntry(item)?.list_status?.status ?? null;
-	}
-
-	function getUserScoreText(item: AnimeTableAnime) {
-		return getUserEntry(item)?.list_status?.display_score ?? null;
-	}
-
-	function getUserScoreValue(item: AnimeTableAnime) {
-		return getUserEntry(item)?.list_status?.sort_score ?? null;
-	}
-
-	function getProgressText(item: AnimeTableAnime) {
-		const userEntry = getUserEntry(item);
-
-		return userEntry ? formatProgress(userEntry) : null;
-	}
-
-	function getProgressSortValue(item: AnimeTableAnime) {
-		const userEntry = getUserEntry(item);
-
-		return userEntry ? getProgressValue(userEntry) : null;
-	}
-
-	function getRelationText(item: AnimeTableAnime) {
-		const id = getAnimeId(item);
-
-		if (typeof id !== 'number') return null;
-		if (!animeData.hasFranchise) return null;
+	function getRelationText(id: number | null) {
+		if (!id || !animeData.hasFranchise) return null;
 		if (animeData.franchiseSeedId === id) return 'Seed';
 
 		const relations = animeData.franchiseRelations.filter((relation) => relation.toId === id);
 
-		if (relations.length === 0) return null;
-
-		return relations
-			.slice(0, 2)
-			.map((relation) => relation.relationLabel)
-			.join(', ');
+		return relations.length
+			? relations
+				.slice(0, 2)
+				.map((relation) => relation.relationLabel)
+				.join(', ')
+			: null;
 	}
 
-	function getRelationSourceText(item: AnimeTableAnime) {
-		const id = getAnimeId(item);
-
-		if (typeof id !== 'number') return null;
+	function getRelationSourceText(id: number | null) {
+		if (!id) return null;
 
 		const relation = animeData.franchiseRelations.find((relation) => relation.toId === id);
-
-		if (!relation) return null;
-
-		const source = animeData.franchiseAnimeById[relation.fromId];
+		const source = relation ? animeData.franchiseAnimeById[relation.fromId] : null;
 
 		return source ? `from ${source.title}` : null;
 	}
 
-	function getMalScoreValue(item: AnimeTableAnime) {
+	function getMalScore(item: AnimeTableAnime) {
 		if (isDbEntry(item)) {
 			const dbItem = item as AnimeDbEntry & {
 				mean?: number | null;
@@ -394,71 +460,27 @@
 			return dbItem.malScore ?? dbItem.mal_score ?? dbItem.mean ?? null;
 		}
 
-		return getBaseAnime(item).mean ?? null;
+		return numberOrNull(getBaseAnime(item).mean);
 	}
 
-	function getMalScoreText(item: AnimeTableAnime) {
-		const malScore = getMalScoreValue(item);
-
-		return typeof malScore === 'number' ? formatDecimal(malScore, 2) : null;
+	function getEpisodes(item: AnimeTableAnime) {
+		return isDbEntry(item)
+			? positiveNumber(item.numEpisodes)
+			: positiveNumber(getBaseAnime(item).num_episodes);
 	}
 
-	function getEpisodesValue(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return item.numEpisodes;
-
-		return getBaseAnime(item).num_episodes ?? null;
+	function getPopularity(item: AnimeTableAnime) {
+		return isDbEntry(item)
+			? positiveNumber(item.popularity)
+			: positiveNumber(getBaseAnime(item).popularity);
 	}
 
-	function getEpisodesText(item: AnimeTableAnime) {
-		const episodes = getEpisodesValue(item);
-
-		if (typeof episodes !== 'number') return null;
-
-		return episodes > 0 ? formatNumber(episodes) : '?';
+	function getMediaType(item: AnimeTableAnime) {
+		return isDbEntry(item) ? item.mediaType : getBaseAnime(item).media_type;
 	}
 
-	function getPopularityValue(item: AnimeTableAnime) {
-		const popularity = isDbEntry(item) ? item.popularity : (getBaseAnime(item).popularity ?? null);
-
-		return typeof popularity === 'number' && popularity > 0 ? popularity : null;
-	}
-
-	function getPopularityText(item: AnimeTableAnime) {
-		const popularity = getPopularityValue(item);
-
-		return typeof popularity === 'number' ? `#${formatNumber(popularity)}` : 'No pop';
-	}
-
-	function getMediaTypeRaw(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return item.mediaType;
-
-		return getBaseAnime(item).media_type ?? null;
-	}
-
-	function getMediaTypeText(item: AnimeTableAnime) {
-		return formatOptionalLabel(getMediaTypeRaw(item));
-	}
-
-	function getAnimeStatusRaw(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return item.status;
-
-		return getBaseAnime(item).status ?? null;
-	}
-
-	function getAnimeStatusText(item: AnimeTableAnime) {
-		return formatOptionalLabel(getAnimeStatusRaw(item));
-	}
-
-	function getSourceText(item: AnimeTableAnime) {
-		return isDbEntry(item) ? formatOptionalLabel(item.source) : null;
-	}
-
-	function getRatingText(item: AnimeTableAnime) {
-		return isDbEntry(item) ? formatOptionalLabel(item.rating) : null;
-	}
-
-	function getNsfwText(item: AnimeTableAnime) {
-		return isDbEntry(item) ? formatOptionalLabel(item.nsfw) : null;
+	function getAnimeStatus(item: AnimeTableAnime) {
+		return isDbEntry(item) ? item.status : getBaseAnime(item).status;
 	}
 
 	function getSeasonText(item: AnimeTableAnime) {
@@ -475,142 +497,69 @@
 		return getSeasonValue({ node: item } as UserAnimeListEdge);
 	}
 
-	function getAverageEpisodeDurationValue(item: AnimeTableAnime) {
+	function getAverageEpisodeDuration(item: AnimeTableAnime) {
 		if (isDbEntry(item)) {
 			const dbItem = item as AnimeDbEntry & {
 				averageEpisodeDuration?: number | null;
 				average_episode_duration?: number | null;
 			};
 
-			return dbItem.averageEpisodeDuration ?? dbItem.average_episode_duration ?? null;
+			return positiveNumber(dbItem.averageEpisodeDuration ?? dbItem.average_episode_duration);
 		}
 
-		return getBaseAnime(item).average_episode_duration ?? null;
+		return positiveNumber(getBaseAnime(item).average_episode_duration);
 	}
 
-	function getAverageEpisodeDurationText(item: AnimeTableAnime) {
-		const duration = getAverageEpisodeDurationValue(item);
+	function getTotalDuration(
+		item: AnimeTableAnime,
+		episodes: number | null,
+		averageDuration: number | null
+	) {
+		if (isDbEntry(item)) return positiveNumber(item.totalDuration);
 
-		return duration && duration > 0 ? `${formatDuration(duration)}/ep` : null;
+		return episodes && averageDuration ? episodes * averageDuration : null;
 	}
 
-	function getTotalDurationValue(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return item.totalDuration ?? null;
-
-		const episodes = getEpisodesValue(item) ?? 0;
-		const duration = getAverageEpisodeDurationValue(item) ?? 0;
-
-		if (episodes <= 0 || duration <= 0) return null;
-
-		return episodes * duration;
+	function getStartDate(item: AnimeTableAnime) {
+		return isDbEntry(item)
+			? (item.startDate ?? null)
+			: ((getBaseAnime(item).start_date as string | null | undefined) ?? null);
 	}
 
-	function getTotalDurationText(item: AnimeTableAnime) {
-		const totalDuration = getTotalDurationValue(item);
+	function getEndDate(item: AnimeTableAnime) {
+		if (isDbEntry(item)) {
+			const dbItem = item as AnimeDbEntry & { endDate?: string | null };
 
-		return totalDuration && totalDuration > 0 ? formatDuration(totalDuration) : null;
-	}
-
-	function getStartDateRaw(item: AnimeTableAnime) {
-		if (isDbEntry(item)) return item.startDate;
-
-		return getBaseAnime(item).start_date ?? null;
-	}
-
-	function getStartDateText(item: AnimeTableAnime) {
-		return getStartDateRaw(item) ?? null;
-	}
-
-	function getStartDateSortValue(item: AnimeTableAnime) {
-		return getYearFromDate(getStartDateRaw(item));
-	}
-
-	function getRankText(item: AnimeTableAnime, displayIndex: number) {
-		if (isRankingEntry(item)) return item.ranking?.rank ?? displayIndex + 1;
-
-		return displayIndex + 1;
-	}
-
-	function getRankSortValue(item: AnimeTableAnime, originalIndex: number) {
-		if (isRankingEntry(item)) return item.ranking?.rank ?? 999999;
-
-		return originalIndex + 1;
-	}
-
-	function getSubtitle(item: AnimeTableAnime) {
-		const parts = [
-			getMediaTypeText(item),
-			isDbEntry(item) ? getSourceText(item) : null,
-			isDbEntry(item) ? getRatingText(item) : null,
-			!isDbEntry(item) ? getSeasonText(item) : null,
-			getEpisodesText(item) ? `${getEpisodesText(item)} eps` : null,
-			getAverageEpisodeDurationText(item),
-			getTotalDurationText(item)
-		];
-
-		return parts.filter(Boolean).join(' · ');
-	}
-
-	function getFilterText(item: AnimeTableAnime) {
-		const values = columns.map((column) => getCellText(item, column.value, 0));
-
-		return [getTitle(item), getSubtitle(item), ...values].filter(Boolean).join(' ');
-	}
-
-	function getCellText(item: AnimeTableAnime, value: ColumnValue, displayIndex: number) {
-		if (value === 'rank') return getRankText(item, displayIndex);
-		if (value === 'title') return getTitle(item);
-		if (value === 'relation') return getRelationText(item);
-		if (value === 'score') return getUserScoreText(item);
-		if (value === 'mal_score') return getMalScoreText(item);
-		if (value === 'progress') return getProgressText(item);
-		if (value === 'episodes') return getEpisodesText(item);
-		if (value === 'season') return getSeasonText(item);
-		if (value === 'popularity') return getPopularityText(item);
-		if (value === 'media_type') return getMediaTypeText(item);
-		if (value === 'anime_status') return getAnimeStatusText(item);
-		if (value === 'source') return getSourceText(item);
-		if (value === 'rating') return getRatingText(item);
-		if (value === 'nsfw') return getNsfwText(item);
-		if (value === 'average_duration') return getAverageEpisodeDurationText(item);
-		if (value === 'total_duration') return getTotalDurationText(item);
-		if (value === 'start_date') return getStartDateText(item);
-
-		return null;
-	}
-
-	function getSortValue(item: AnimeTableAnime, value: ColumnValue, originalIndex: number) {
-		if (value === 'rank') return getRankSortValue(item, originalIndex);
-		if (value === 'title') return getTitle(item);
-		if (value === 'relation') return getRelationText(item);
-		if (value === 'score') return getUserScoreValue(item);
-		if (value === 'mal_score') return getMalScoreValue(item);
-		if (value === 'progress') return getProgressSortValue(item);
-		if (value === 'episodes') return getEpisodesValue(item);
-		if (value === 'season') return getSeasonSortValue(item);
-		if (value === 'popularity') return getPopularityValue(item);
-		if (value === 'media_type') return getMediaTypeText(item);
-		if (value === 'anime_status') return getAnimeStatusText(item);
-		if (value === 'source') return getSourceText(item);
-		if (value === 'rating') return getRatingText(item);
-		if (value === 'nsfw') return getNsfwText(item);
-		if (value === 'average_duration') return getAverageEpisodeDurationValue(item);
-		if (value === 'total_duration') return getTotalDurationValue(item);
-		if (value === 'start_date') return getStartDateSortValue(item);
-
-		return null;
-	}
-
-	function isColumnRelevant(item: AnimeTableAnime, value: ColumnValue) {
-		if (value === 'relation') {
-			return hasValue(getRelationText(item)) || hasValue(getRelationSourceText(item));
+			return dbItem.endDate ?? null;
 		}
 
-		if (value === 'score' || value === 'progress') {
-			return Boolean(getUserEntry(item));
-		}
+		return (getBaseAnime(item).end_date as string | null | undefined) ?? null;
+	}
 
-		return hasValue(getCellText(item, value, 0));
+	function formatDbSeason(anime: AnimeDbEntry) {
+		const year = anime.startSeason?.year ?? yearFromDate(anime.startDate);
+		const season = anime.startSeason?.season;
+
+		if (!year) return null;
+
+		return season ? `${capitalize(season)} ${year}` : String(year);
+	}
+
+	function getDbSeasonValue(anime: AnimeDbEntry) {
+		const year = anime.startSeason?.year ?? yearFromDate(anime.startDate);
+
+		if (!year) return null;
+
+		return year * 10 + getSeasonOrder(anime.startSeason?.season);
+	}
+
+	function getSeasonOrder(season?: string | null) {
+		if (season === 'winter') return 1;
+		if (season === 'spring') return 2;
+		if (season === 'summer') return 3;
+		if (season === 'fall') return 4;
+
+		return 0;
 	}
 
 	function compareValues(a: unknown, b: unknown) {
@@ -636,50 +585,33 @@
 	}
 
 	function hasValue(value: unknown) {
-		if (isMissing(value)) return false;
-
-		return String(value).trim() !== '';
+		return !isMissing(value) && String(value).trim() !== '';
 	}
 
-	function formatOptionalLabel(value: string | null | undefined) {
-		return value ? formatLabel(value) : null;
+	function label(value: unknown) {
+		return typeof value === 'string' && value ? formatLabel(value) : null;
 	}
 
-	function formatDbSeason(anime: AnimeDbEntry) {
-		const year = anime.startSeason.year ?? getYearFromDate(anime.startDate);
-		const season = anime.startSeason.season;
-
-		if (!year) return null;
-		if (!season) return String(year);
-
-		return `${capitalize(season)} ${year}`;
+	function positiveNumber(value: unknown) {
+		return typeof value === 'number' && value > 0 ? value : null;
 	}
 
-	function getDbSeasonValue(anime: AnimeDbEntry) {
-		const year = anime.startSeason.year ?? getYearFromDate(anime.startDate);
-
-		if (!year) return null;
-
-		return year * 10 + getSeasonOrder(anime.startSeason.season);
+	function numberOrNull(value: unknown) {
+		return typeof value === 'number' ? value : null;
 	}
 
-	function getSeasonOrder(season?: string | null) {
-		if (season === 'winter') return 1;
-		if (season === 'spring') return 2;
-		if (season === 'summer') return 3;
-		if (season === 'fall') return 4;
-
-		return 0;
-	}
-
-	function getYearFromDate(date?: string | null) {
-		if (!date) return null;
-
-		return Number(date.slice(0, 4)) || null;
+	function yearFromDate(date?: string | null) {
+		return date ? Number(date.slice(0, 4)) || null : null;
 	}
 
 	function capitalize(value: string) {
 		return value.charAt(0).toUpperCase() + value.slice(1);
+	}
+
+	function sortIcon(column: Column) {
+		if (selectedSort !== column.value) return '△';
+
+		return direction === 'desc' ? '▽' : '△';
 	}
 
 	function alignClass(align: Column['align']) {
@@ -689,6 +621,17 @@
 		return 'text-left';
 	}
 
+	function cellClass(column: Column) {
+		return [
+			'px-3 py-2 whitespace-nowrap text-text-soft',
+			alignClass(column.align),
+			column.value === 'rank' && 'font-mono text-xs text-text-muted',
+			(column.value === 'score' || column.value === 'mal_score') && 'font-medium text-primary'
+		]
+			.filter(Boolean)
+			.join(' ');
+	}
+
 	function normalize(value: string) {
 		return value
 			.toLowerCase()
@@ -696,18 +639,6 @@
 			.replace(/\p{Diacritic}/gu, '')
 			.trim();
 	}
-
-	const tableWidth = $derived.by(() => {
-		const widths = visibleColumns
-			.map((column) => column.width)
-			.filter((width): width is string => Boolean(width));
-
-		if (widths.length !== visibleColumns.length) {
-			return '100%';
-		}
-
-		return `max(100%, calc(${widths.join(' + ')}))`;
-	});
 </script>
 
 <div class={`min-w-0 max-w-full overflow-hidden rounded-md border border-border bg-surface ${className}`}>
@@ -718,27 +649,22 @@
 			{/if}
 
 			{#if showColumnControls}
-				<div class="grid min-w-0 gap-1">
-					<div class="flex min-w-0 flex-wrap gap-1">
-						{#each relevantColumns as column (column.value)}
-							<Checkbox
-								label={column.label}
-								checked={isColumnVisible(column.value)}
-								disabled={isColumnDisabled(column)}
-								onchange={() => toggleColumn(column)}
-							/>
-						{/each}
-					</div>
+				<div class="flex min-w-0 flex-wrap gap-1">
+					{#each relevantColumns as column (column.value)}
+						<Checkbox
+							label={column.label}
+							checked={isVisible(column.value)}
+							disabled={isColumnDisabled(column)}
+							onchange={() => toggleColumn(column)}
+						/>
+					{/each}
 				</div>
 			{/if}
 		</div>
 	{/if}
 
 	<div class="min-w-0 max-w-full overflow-x-auto">
-		<table
-			class="table-fixed border-collapse text-sm"
-			style:width={tableWidth}
-		>
+		<table class="table-fixed border-collapse text-sm" style:width={tableWidth}>
 			<colgroup>
 				{#each visibleColumns as column (column.value)}
 					<col style:width={column.width} />
@@ -757,12 +683,11 @@
 							<span>{column.label}</span>
 
 							<span
-								class={`
-										inline-block w-3 text-right text-primary
-										${selectedSort === column.value ? 'opacity-100' : 'opacity-0'}
-									`}
+								class={`inline-block w-3 text-right text-primary ${
+										selectedSort === column.value ? 'opacity-100' : 'opacity-0'
+									}`}
 							>
-									{getSortIcon(column)}
+									{sortIcon(column)}
 								</span>
 						</button>
 					</th>
@@ -771,110 +696,66 @@
 			</thead>
 
 			<tbody class="divide-y divide-border">
-			{#if sortedRows.length > 0}
+			{#if sortedRows.length}
 				{#each sortedRows as row, displayIndex (row.key)}
 					<tr class="transition hover:bg-surface-soft">
 						{#each visibleColumns as column (column.value)}
 							{#if column.value === 'title'}
 								<td class="max-w-96 px-3 py-2">
-									{#if getUrl(row.item)}
-										<a
-											href={getUrl(row.item)}
-											target="_blank"
-											rel="noreferrer"
-											class="flex min-w-0 items-center gap-3 text-text transition hover:text-primary"
-										>
-											{#if getImageUrl(row.item)}
-												<img
-													src={getImageUrl(row.item)}
-													alt={getTitle(row.item)}
-													class="size-9 shrink-0 rounded-md object-cover"
-												/>
-											{:else}
-												<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
+									<a
+										href={row.url ?? undefined}
+										target={row.url ? '_blank' : undefined}
+										rel={row.url ? 'noreferrer' : undefined}
+										class={`flex min-w-0 items-center gap-3 text-text transition ${
+												row.url ? 'hover:text-primary' : 'cursor-default'
+											}`}
+									>
+										{#if row.imageUrl}
+											<img
+												src={row.imageUrl}
+												alt={row.title}
+												class="size-9 shrink-0 rounded-md object-cover"
+											/>
+										{:else}
+											<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
+										{/if}
+
+										<div class="min-w-0">
+											<span class="block truncate font-medium">{row.title}</span>
+
+											{#if row.subtitle || row.userStatus}
+	<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
+		{#if row.userStatus}
+			<StatusBadge class="mt-0.5" status={row.userStatus} />
+		{/if}
+
+		{#if row.subtitle}
+			<span class="truncate">{row.subtitle}</span>
+		{/if}
+	</span>
 											{/if}
 
-											<div class="min-w-0">
-													<span class="block truncate font-medium">
-														{getTitle(row.item)}
-													</span>
-
-												{#if getSubtitle(row.item) || getUserStatusName(row.item)}
-														<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
-															{#if getUserStatusName(row.item)}
-																<StatusBadge
-																	class="mt-0.5"
-																	status={getUserStatusName(row.item)}
-																/>
-															{/if}
-
-															{#if getSubtitle(row.item)}
-																<span class="truncate">{getSubtitle(row.item)}</span>
-															{/if}
-														</span>
-												{/if}
-											</div>
-										</a>
-									{:else}
-										<div class="flex min-w-0 items-center gap-3">
-											{#if getImageUrl(row.item)}
-												<img
-													src={getImageUrl(row.item)}
-													alt={getTitle(row.item)}
-													class="size-9 shrink-0 rounded-md object-cover"
-												/>
-											{:else}
-												<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
+											{#if row.subtitleExtra}
+	<span class="block truncate text-[10px] text-text-muted">
+		{row.subtitleExtra}
+	</span>
 											{/if}
-
-											<div class="min-w-0">
-													<span class="block truncate font-medium text-text">
-														{getTitle(row.item)}
-													</span>
-
-												{#if getSubtitle(row.item) || getUserStatusName(row.item)}
-														<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
-															{#if getUserStatusName(row.item)}
-																<StatusBadge
-																	class="mt-0.5"
-																	status={getUserStatusName(row.item)}
-																/>
-															{/if}
-
-															{#if getSubtitle(row.item)}
-																<span class="truncate">{getSubtitle(row.item)}</span>
-															{/if}
-														</span>
-												{/if}
-											</div>
 										</div>
-									{/if}
+									</a>
 								</td>
 							{:else if column.value === 'relation'}
 								<td class="px-3 py-2 text-text-soft">
 									<div class="max-w-44">
-										<p class="truncate">
-											{getCellText(row.item, column.value, displayIndex) ?? '-'}
-										</p>
+										<p class="truncate">{cell(row, column.value, displayIndex) ?? '-'}</p>
 
-										{#if getRelationSourceText(row.item)}
-											<p class="truncate text-xs text-text-muted">
-												{getRelationSourceText(row.item)}
-											</p>
+										{#if row.relationSource}
+											<p class="truncate text-xs text-text-muted">{row.relationSource}</p>
 										{/if}
 									</div>
 								</td>
 							{:else}
-								<td
-									class={`px-3 py-2 whitespace-nowrap text-text-soft ${alignClass(column.align)} ${
-											column.value === 'rank' ? 'font-mono text-xs text-text-muted' : ''
-										} ${
-											column.value === 'score' || column.value === 'mal_score'
-												? 'font-medium text-primary'
-												: ''
-										}`}
-								>
-									{getCellText(row.item, column.value, displayIndex) ?? '-'}
+								<td class={cellClass(column)}>
+									{cell(row, column.value, displayIndex) ?? '-'}
 								</td>
 							{/if}
 						{/each}

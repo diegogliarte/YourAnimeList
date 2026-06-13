@@ -1,5 +1,5 @@
 <script lang="ts">
-	import AnimeTable from '$lib/components/ui/AnimeTable.svelte';
+	import AnimeTable, { type AnimeTableAnime } from '$lib/components/ui/AnimeTable.svelte';
 	import FranchiseGraph from '$lib/components/franchise/FranchiseGraph.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
@@ -8,21 +8,20 @@
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { AnimeDetails, AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
-	import {
-		compareAnimeRelease,
-		formatSeason,
-		getAnimeUrl,
-	} from '$lib/utils/anime.utils';
-	import {
-		formatDecimal,
-		formatDuration,
-		formatNumber
-	} from '$lib/utils/format.utils';
+	import { compareAnimeRelease, formatSeason, getAnimeUrl } from '$lib/utils/anime.utils';
+	import { formatDecimal, formatDuration, formatNumber } from '$lib/utils/format.utils';
 
 	type Stat = {
 		label: string;
 		value: string | number;
 		hint?: string;
+	};
+
+	type PlacementCandidate = {
+		host: AnimeDetails;
+		afterEpisode: number;
+		beforeEpisode: number | null;
+		spanDays: number;
 	};
 
 	let showSearch = $state(false);
@@ -71,12 +70,14 @@
 			.sort((a, b) => compareAnimeRelease({ node: a }, { node: b }));
 	});
 
+	const franchiseWatchHints = $derived.by(() => {
+		return getFranchiseWatchHints(animeData.franchiseAnimeList);
+	});
+
 	const franchiseStats = $derived.by<Stat[]>(() => {
 		const entries = animeData.franchiseAnimeList;
 
-		const completedCount = entries.filter(
-			(anime) => getUserStatus(anime.id) === 'completed'
-		).length;
+		const completedCount = entries.filter((anime) => getUserStatus(anime.id) === 'completed').length;
 
 		const knownEpisodeEntries = entries.filter((anime) => (anime.num_episodes ?? 0) > 0);
 		const totalEpisodes = knownEpisodeEntries.reduce(
@@ -172,7 +173,8 @@
 			formatSeason({ node: anime }),
 			getEpisodeText(anime),
 			getAverageEpisodeDurationText(anime),
-			getTotalDurationText(anime)
+			getTotalDurationText(anime),
+			getWatchHintForAnime(anime.id)
 		]
 			.filter(Boolean)
 			.join(' · ');
@@ -203,6 +205,178 @@
 		if (episodes <= 0 || duration <= 0) return 0;
 
 		return episodes * duration;
+	}
+
+	function getWatchHintForTableItem(item: AnimeTableAnime) {
+		const id = getTableAnimeId(item);
+
+		return id ? getWatchHintForAnime(id) : null;
+	}
+
+	function getWatchHintForAnime(animeId: number) {
+		return franchiseWatchHints.get(animeId) ?? null;
+	}
+
+	function getTableAnimeId(item: AnimeTableAnime) {
+		if ('node' in item) return item.node.id;
+
+		return item.id;
+	}
+
+	function getFranchiseWatchHints(entries: AnimeDetails[]) {
+		const hints = new Map<number, string>();
+
+		for (const anime of entries) {
+			if (!shouldEstimateWatchPlacement(anime)) continue;
+
+			const placement = findWatchPlacement(anime, entries);
+
+			if (placement) {
+				hints.set(anime.id, placement);
+			}
+		}
+
+		return hints;
+	}
+
+	function shouldEstimateWatchPlacement(anime: AnimeDetails) {
+		return [
+			'movie',
+			'special',
+			'tv_special',
+			'ova',
+			'ona',
+			'cm'
+		].includes(anime.media_type ?? '');
+	}
+
+	function findWatchPlacement(target: AnimeDetails, entries: AnimeDetails[]) {
+		const targetStartDate = parseExactAnimeDate(target.start_date);
+		const targetEndDate = parseExactAnimeDate(target.end_date) ?? targetStartDate;
+
+		if (!targetStartDate) return null;
+
+		const candidates = entries
+			.filter((host) => {
+				if (host.id === target.id) return false;
+				return areDirectlyRelatedAnime(target.id, host.id);
+			})
+			.map((host) => getPlacementCandidate(targetStartDate, targetEndDate, host))
+			.filter((candidate): candidate is PlacementCandidate => Boolean(candidate))
+			.sort((a, b) => {
+				const priorityDifference = getHostPriority(a.host) - getHostPriority(b.host);
+
+				if (priorityDifference !== 0) return priorityDifference;
+
+				return a.spanDays - b.spanDays;
+			});
+
+		const best = candidates[0];
+
+		if (!best) return null;
+
+		if (best.beforeEpisode) {
+			return `Watch between eps ${best.afterEpisode}–${best.beforeEpisode} of ${best.host.title}`;
+		}
+
+		return `Watch after ep ${best.afterEpisode} of ${best.host.title}`;
+	}
+
+	function areDirectlyRelatedAnime(firstAnimeId: number, secondAnimeId: number) {
+		return animeData.franchiseRelations.some((relation) => {
+			return (
+				(relation.fromId === firstAnimeId && relation.toId === secondAnimeId) ||
+				(relation.fromId === secondAnimeId && relation.toId === firstAnimeId)
+			);
+		});
+	}
+
+	function getPlacementCandidate(
+		targetStartDate: Date,
+		targetEndDate: Date,
+		host: AnimeDetails
+	): PlacementCandidate | null {
+		const episodes = host.num_episodes ?? 0;
+
+		if (episodes <= 1) return null;
+
+		const hostStartDate = parseExactAnimeDate(host.start_date);
+		const hostEndDate = parseExactAnimeDate(host.end_date);
+
+		if (!hostStartDate || !hostEndDate) return null;
+		if (targetStartDate < hostStartDate || targetStartDate > hostEndDate) return null;
+
+		const spanDays = daysBetween(hostStartDate, hostEndDate);
+
+		if (spanDays <= 0) return null;
+
+		const episodeGapDays = spanDays / Math.max(episodes - 1, 1);
+
+		const startEpisode = getEstimatedEpisodeAtDate(
+			targetStartDate,
+			hostStartDate,
+			episodeGapDays,
+			episodes
+		);
+
+		const endEpisode = getEstimatedEpisodeAtDate(
+			targetEndDate,
+			hostStartDate,
+			episodeGapDays,
+			episodes
+		);
+
+		const afterEpisode = Math.min(startEpisode, endEpisode);
+		const lastEpisode = Math.max(startEpisode, endEpisode);
+		const beforeEpisode = lastEpisode < episodes ? lastEpisode + 1 : null;
+
+		return {
+			host,
+			afterEpisode,
+			beforeEpisode,
+			spanDays
+		};
+	}
+
+	function getEstimatedEpisodeAtDate(
+		date: Date,
+		hostStartDate: Date,
+		episodeGapDays: number,
+		totalEpisodes: number
+	) {
+		const elapsedDays = daysBetween(hostStartDate, date);
+
+		return clamp(Math.floor(elapsedDays / episodeGapDays) + 1, 1, totalEpisodes);
+	}
+
+	function getHostPriority(anime: AnimeDetails) {
+		if (anime.media_type === 'tv') return 0;
+		if (anime.media_type === 'ona') return 1;
+		if (anime.media_type === 'ova') return 2;
+
+		return 3;
+	}
+
+	function parseExactAnimeDate(value?: string | null) {
+		if (!value) return null;
+
+		const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+
+		if (!match) return null;
+
+		const [, year, month, day] = match;
+
+		return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+	}
+
+	function daysBetween(start: Date, end: Date) {
+		const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+		return Math.round((end.getTime() - start.getTime()) / millisecondsPerDay);
+	}
+
+	function clamp(value: number, min: number, max: number) {
+		return Math.min(Math.max(value, min), max);
 	}
 </script>
 
@@ -391,7 +565,11 @@
 				getSubtitle={getSubtitle}
 			/>
 		{:else}
-			<AnimeTable items={animeData.franchiseAnimeList} filterPlaceholder="Filter franchise..." />
+			<AnimeTable
+				items={animeData.franchiseAnimeList}
+				filterPlaceholder="Filter franchise..."
+				getSubtitleExtra={getWatchHintForTableItem}
+			/>
 		{/if}
 	{:else if !animeData.franchiseSearchResults.length}
 		<Panel>
