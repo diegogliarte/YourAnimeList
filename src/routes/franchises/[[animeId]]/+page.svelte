@@ -297,9 +297,10 @@
 
 	function findWatchPlacement(target: AnimeDetails, entries: AnimeDetails[]) {
 		const targetStartDate = parseExactAnimeDate(target.start_date);
-		const targetEndDate = parseExactAnimeDate(target.end_date) ?? targetStartDate;
 
 		if (!targetStartDate) return null;
+
+		const targetEndDate = parseExactAnimeDate(target.end_date) ?? targetStartDate;
 
 		const candidates = entries
 			.filter((host) => {

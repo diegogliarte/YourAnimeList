@@ -170,12 +170,15 @@
 	});
 
 	const sortedRows = $derived.by(() => {
-		if (!selectedSort || !direction || !isVisible(selectedSort)) return filteredRows;
+		const sort = selectedSort;
+		const sortDirection = direction;
+
+		if (!sort || !sortDirection || !isVisible(sort)) return filteredRows;
 
 		return [...filteredRows].sort((a, b) => {
-			const result = compareValues(a.sorts[selectedSort], b.sorts[selectedSort]);
+			const result = compareValues(a.sorts[sort], b.sorts[sort]);
 
-			return direction === 'desc' ? -result : result;
+			return sortDirection === 'desc' ? -result : result;
 		});
 	});
 

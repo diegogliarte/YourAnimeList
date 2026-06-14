@@ -95,9 +95,24 @@
 		}
 	}
 
-	function handleKeydown(event: KeyboardEvent) {
+	function handleWindowKeydown(event: KeyboardEvent) {
+		if (!open) return;
+
 		if (event.key === 'Escape') {
 			close();
+		}
+	}
+
+	function handleRemoveKeydown(event: KeyboardEvent, option: MultiSelectOption) {
+		if (event.key === 'Escape') {
+			close();
+			return;
+		}
+
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			event.stopPropagation();
+			removeOption(option);
 		}
 	}
 
@@ -110,16 +125,30 @@
 	}
 </script>
 
+<svelte:window onkeydown={handleWindowKeydown} />
+
 <div
 	class={`relative grid min-w-0 gap-1 text-xs text-text-muted ${className}`}
 	onfocusout={handleFocusOut}
-	onkeydown={handleKeydown}
 >
-	<span class="truncate">{label}</span>
+	<button
+		type="button"
+		{disabled}
+		class="
+			min-w-0 truncate text-left text-xs text-text-muted transition
+			hover:text-text
+			focus:text-text focus:outline-none
+			disabled:cursor-not-allowed disabled:opacity-60
+		"
+		onclick={toggleOpen}
+	>
+		{label}
+	</button>
 
 	<button
 		type="button"
 		{disabled}
+		aria-haspopup="listbox"
 		aria-expanded={open}
 		class={`
 			flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border
@@ -152,13 +181,7 @@
 								event.stopPropagation();
 								removeOption(option);
 							}}
-							onkeydown={(event) => {
-								if (event.key === 'Enter' || event.key === ' ') {
-									event.preventDefault();
-									event.stopPropagation();
-									removeOption(option);
-								}
-							}}
+							onkeydown={(event) => handleRemoveKeydown(event, option)}
 						>
 							×
 						</span>
