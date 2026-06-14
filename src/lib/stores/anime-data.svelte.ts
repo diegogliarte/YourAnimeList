@@ -440,15 +440,14 @@ class AnimeDataStore {
 	}
 
 	async startFranchise(seedId: number) {
-		this.clearFranchise();
-
-		const runId = ++this.franchiseRunId;
+		const runId = this.startNewFranchiseRun();
 
 		this.franchiseSeedId = seedId;
 		this.addAcceptedId(seedId);
 
 		const loadedFromDb = await this.loadFranchiseFromDb(seedId, runId);
 
+		if (!this.isActiveFranchiseRun(runId)) return;
 		if (loadedFromDb) return;
 
 		this.enqueueFranchiseAnime(seedId);
@@ -464,12 +463,15 @@ class AnimeDataStore {
 
 		const runId = this.franchiseRunId;
 
+		if (!this.isActiveFranchiseRun(runId)) return;
+
 		this.franchiseRejectedIds = this.franchiseRejectedIds.filter((id) => id !== animeId);
 		this.removePendingCandidate(animeId);
 		this.addAcceptedId(animeId);
 
 		const loadedFromDb = await this.loadFranchiseFromDb(animeId, runId);
 
+		if (!this.isActiveFranchiseRun(runId)) return;
 		if (loadedFromDb) return;
 
 		this.forceMalFranchiseFetch(animeId);
@@ -485,6 +487,8 @@ class AnimeDataStore {
 
 		const runId = this.franchiseRunId;
 
+		if (!this.isActiveFranchiseRun(runId)) return;
+
 		this.removePendingCandidate(animeId);
 		this.franchiseRejectedIds = this.franchiseRejectedIds.filter((id) => id !== animeId);
 
@@ -498,6 +502,7 @@ class AnimeDataStore {
 
 		const loadedFromDb = await this.loadFranchiseFromDb(animeId, runId);
 
+		if (!this.isActiveFranchiseRun(runId)) return;
 		if (loadedFromDb) return;
 
 		this.forceMalFranchiseFetch(animeId);
@@ -519,8 +524,8 @@ class AnimeDataStore {
 	}
 
 	stopFranchiseCrawl() {
-		this.franchiseStopRequested = true;
 		this.franchiseRunId += 1;
+		this.franchiseStopRequested = true;
 		this.franchiseQueue = [];
 		this.franchiseCrawling = false;
 	}
@@ -544,19 +549,8 @@ class AnimeDataStore {
 	}
 
 	clearFranchise() {
-		this.franchiseRunId += 1;
-		this.franchiseStopRequested = true;
-
-		this.franchiseSeedId = null;
-		this.franchiseAnimeById = {};
-		this.franchiseAcceptedIds = [];
-		this.franchiseRejectedIds = [];
-		this.franchiseVisitedIds = [];
-		this.franchiseQueue = [];
-		this.franchiseRelations = [];
-		this.franchisePendingCandidates = [];
-		this.franchiseCrawling = false;
-		this.franchiseError = null;
+		this.stopFranchiseCrawl();
+		this.clearFranchiseStateOnly();
 	}
 
 	clearRecommendations() {
@@ -577,6 +571,40 @@ class AnimeDataStore {
 		this.recommendationSearchError = null;
 	}
 
+	clearFranchiseSearch() {
+		this.franchiseSearchRequestId += 1;
+		this.franchiseQuery = '';
+		this.franchiseSearchResults = [];
+		this.franchiseSearchLoading = false;
+		this.franchiseSearchError = null;
+	}
+
+	private startNewFranchiseRun() {
+		const runId = ++this.franchiseRunId;
+
+		this.franchiseStopRequested = false;
+		this.clearFranchiseStateOnly();
+
+		return runId;
+	}
+
+	private clearFranchiseStateOnly() {
+		this.franchiseSeedId = null;
+		this.franchiseAnimeById = {};
+		this.franchiseAcceptedIds = [];
+		this.franchiseRejectedIds = [];
+		this.franchiseVisitedIds = [];
+		this.franchiseQueue = [];
+		this.franchiseRelations = [];
+		this.franchisePendingCandidates = [];
+		this.franchiseCrawling = false;
+		this.franchiseError = null;
+	}
+
+	private isActiveFranchiseRun(runId: number) {
+		return runId === this.franchiseRunId && !this.franchiseStopRequested;
+	}
+
 	private forceMalFranchiseFetch(animeId: number) {
 		this.franchiseVisitedIds = this.franchiseVisitedIds.filter((id) => id !== animeId);
 
@@ -587,22 +615,24 @@ class AnimeDataStore {
 	}
 
 	private async loadFranchiseFromDb(seedId: number, runId: number) {
-		if (runId !== this.franchiseRunId) return false;
+		if (!this.isActiveFranchiseRun(runId)) return false;
 
 		try {
 			this.franchiseCrawling = true;
 			this.franchiseError = null;
-			this.franchiseStopRequested = false;
 
 			const response = await fetch(`/api/mal/anime/franchise/${seedId}`);
 
+			if (!this.isActiveFranchiseRun(runId)) return false;
 			if (!response.ok) return false;
 
 			const result = (await response.json()) as AnimeDbFranchiseResponse;
+
+			if (!this.isActiveFranchiseRun(runId)) return false;
+
 			const nodes = result.data.nodes;
 
 			if (nodes.length === 0) return false;
-			if (runId !== this.franchiseRunId || this.franchiseStopRequested) return false;
 
 			const animeById = { ...this.franchiseAnimeById };
 
@@ -613,13 +643,19 @@ class AnimeDataStore {
 			this.franchiseAnimeById = animeById;
 
 			for (const node of nodes) {
+				if (!this.isActiveFranchiseRun(runId)) return false;
+
 				this.addVisitedId(node.id);
 			}
 
 			this.addAcceptedId(seedId);
 
 			for (const node of nodes) {
+				if (!this.isActiveFranchiseRun(runId)) return false;
+
 				for (const relation of node.related_anime ?? []) {
+					if (!this.isActiveFranchiseRun(runId)) return false;
+
 					this.processDbFranchiseRelation(node.id, relation);
 				}
 			}
@@ -637,18 +673,14 @@ class AnimeDataStore {
 	}
 
 	private async crawlFranchiseQueue(runId: number) {
+		if (!this.isActiveFranchiseRun(runId)) return;
 		if (this.franchiseCrawling) return;
 
 		this.franchiseCrawling = true;
 		this.franchiseError = null;
-		this.franchiseStopRequested = false;
 
 		try {
-			while (
-				this.franchiseQueue.length > 0 &&
-				!this.franchiseStopRequested &&
-				runId === this.franchiseRunId
-			) {
+			while (this.franchiseQueue.length > 0 && this.isActiveFranchiseRun(runId)) {
 				const animeId = this.franchiseQueue[0];
 
 				this.franchiseQueue = this.franchiseQueue.slice(1);
@@ -656,7 +688,7 @@ class AnimeDataStore {
 				await this.crawlFranchiseAnime(animeId, runId);
 			}
 		} catch (error) {
-			if (runId === this.franchiseRunId) {
+			if (this.isActiveFranchiseRun(runId)) {
 				this.franchiseError = error instanceof Error ? error.message : 'Failed to crawl franchise';
 			}
 		} finally {
@@ -667,12 +699,12 @@ class AnimeDataStore {
 	}
 
 	private async crawlFranchiseAnime(animeId: number, runId: number) {
-		if (runId !== this.franchiseRunId) return;
+		if (!this.isActiveFranchiseRun(runId)) return;
 		if (this.franchiseVisitedIds.includes(animeId)) return;
 
 		const details = await this.fetchFranchiseAnimeDetails(animeId);
 
-		if (runId !== this.franchiseRunId || this.franchiseStopRequested) return;
+		if (!this.isActiveFranchiseRun(runId)) return;
 
 		this.addVisitedId(animeId);
 
@@ -684,7 +716,7 @@ class AnimeDataStore {
 		this.addAcceptedId(details.id);
 
 		for (const relation of details.related_anime ?? []) {
-			if (runId !== this.franchiseRunId || this.franchiseStopRequested) return;
+			if (!this.isActiveFranchiseRun(runId)) return;
 
 			this.processFranchiseRelation(details.id, relation);
 		}

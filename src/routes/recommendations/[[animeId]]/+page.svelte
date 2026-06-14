@@ -1,19 +1,19 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import AnimeSearchPanel from '$lib/components/anime/AnimeSearchPanel.svelte';
 	import AnimeTable, {
 		type AnimeTableAnime,
 		type AnimeTableExtraColumn
 	} from '$lib/components/ui/AnimeTable.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
-	import { formatSeason } from '$lib/utils/anime.utils';
 	import type { PageProps } from './$types';
 
 	let { params }: PageProps = $props();
 
 	let startedAnimeId = $state<number | null>(null);
+	let lastRouteAnimeId = $state<number | null | undefined>(undefined);
 
 	const recommendationExtraColumns: AnimeTableExtraColumn[] = [
 		{
@@ -51,12 +51,24 @@
 	});
 
 	$effect(() => {
-		if (!routeAnimeId) return;
-		if (startedAnimeId === routeAnimeId) return;
+		const animeId = routeAnimeId;
 
-		startedAnimeId = routeAnimeId;
+		if (lastRouteAnimeId === animeId) return;
 
-		void animeData.loadRecommendations(routeAnimeId);
+		lastRouteAnimeId = animeId;
+
+		if (!animeId) {
+			startedAnimeId = null;
+			animeData.clearRecommendations();
+			animeData.clearRecommendationSearch();
+			return;
+		}
+
+		if (startedAnimeId === animeId) return;
+
+		startedAnimeId = animeId;
+
+		void animeData.loadRecommendations(animeId);
 	});
 
 	function submitSearch() {
@@ -65,8 +77,11 @@
 
 	async function selectSearchResult(animeId: number) {
 		startedAnimeId = animeId;
+		lastRouteAnimeId = animeId;
 
 		await animeData.loadRecommendations(animeId);
+
+		animeData.clearRecommendationSearch();
 
 		void goto(`/recommendations/${animeId}`, {
 			replaceState: true,
@@ -79,6 +94,7 @@
 		animeData.clearRecommendations();
 		animeData.clearRecommendationSearch();
 		startedAnimeId = null;
+		lastRouteAnimeId = null;
 
 		void goto('/recommendations', {
 			replaceState: true,
@@ -130,95 +146,44 @@
 	}
 </script>
 
-<div class="grid gap-4">
-	<Panel title="Recommendations">
-		<div class="flex flex-wrap items-center justify-between gap-2">
-			<form
-				class="flex min-w-0 flex-wrap items-center gap-2"
-				onsubmit={(event) => {
-					event.preventDefault();
-					submitSearch();
-				}}
-			>
-				<Input
-					bind:value={animeData.recommendationQuery}
-					placeholder="Search anime..."
-					class="w-60"
-					disabled={animeData.recommendationSearchLoading || animeData.recommendationLoading}
-				/>
+<AnimeSearchPanel
+	title="Recommendations"
+	bind:query={animeData.recommendationQuery}
+	results={animeData.recommendationSearchResults}
+	loading={animeData.recommendationSearchLoading}
+	error={animeData.recommendationSearchError}
+	disabled={animeData.recommendationLoading}
+	selectDisabled={animeData.recommendationLoading}
+	resultsTitle="Search results"
+	emptyText="Search for an anime to find similar anime through two-step recommendations."
+	showEmpty={!animeData.recommendationSeed && !animeData.recommendationLoading}
+	onSearch={submitSearch}
+	onSelect={selectSearchResult}
+>
+	{#snippet actions()}
+		{#if animeData.recommendationSeed}
+			<Button type="button" onclick={startNewSearch}>New search</Button>
+		{/if}
+	{/snippet}
 
-				<Button
-					type="submit"
-					variant="primary"
-					disabled={animeData.recommendationSearchLoading || animeData.recommendationLoading}
-				>
-					{animeData.recommendationSearchLoading ? 'Searching...' : 'Search'}
-				</Button>
-
-				{#if animeData.recommendationSeed}
-					<Button type="button" onclick={startNewSearch}>New search</Button>
-				{/if}
-			</form>
-		</div>
-	</Panel>
-
-	{#if animeData.recommendationSearchError}
-		<Panel>
-			<p class="text-sm text-primary">{animeData.recommendationSearchError}</p>
-		</Panel>
-	{/if}
-
-	{#if animeData.recommendationSearchResults.length > 0}
-		<Panel title="Search results">
-			<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-				{#each animeData.recommendationSearchResults as result (result.node.id)}
-					<button
-						type="button"
-						class="flex cursor-pointer gap-3 rounded-md border border-border bg-surface p-2 text-left transition hover:border-primary hover:bg-surface-soft"
-						disabled={animeData.recommendationLoading}
-						onclick={() => selectSearchResult(result.node.id)}
-					>
-						{#if result.node.main_picture?.medium}
-							<img
-								src={result.node.main_picture.medium}
-								alt={result.node.title}
-								class="size-12 shrink-0 rounded-md object-cover"
-							/>
-						{:else}
-							<div class="size-12 shrink-0 rounded-md bg-surface-soft"></div>
-						{/if}
-
-						<div class="min-w-0">
-							<p class="truncate text-sm font-medium text-text">{result.node.title}</p>
-							<p class="mt-1 text-xs text-text-muted">
-								{result.node.media_type ?? 'unknown'} · {formatSeason(result)}
-							</p>
-						</div>
-					</button>
-				{/each}
-			</div>
-		</Panel>
-	{/if}
-
-	{#if animeData.recommendationLoading}
-		<Panel>Loading recommendations...</Panel>
-	{:else if animeData.recommendationError}
-		<Panel>
-			<p class="text-sm text-primary">{animeData.recommendationError}</p>
-		</Panel>
-	{:else if animeData.recommendationSeed}
-		<AnimeTable
-			items={animeData.recommendationAnimeList}
-			filterPlaceholder="Filter recommendations..."
-			defaultSort="recommendation_score"
-			defaultDirection="desc"
-			extraColumns={recommendationExtraColumns}
-		/>
-	{:else if !animeData.recommendationSearchResults.length}
-		<Panel>
-			<p class="text-sm text-text-muted">
-				Search for an anime to find similar anime through two-step recommendations.
-			</p>
-		</Panel>
-	{/if}
-</div>
+	{#snippet children()}
+		{#if animeData.recommendationLoading}
+			<Panel>
+				<p class="text-sm text-text-muted">Loading recommendations...</p>
+			</Panel>
+		{:else if animeData.recommendationError}
+			<Panel>
+				<p class="text-sm text-primary">{animeData.recommendationError}</p>
+			</Panel>
+		{:else if animeData.recommendationSeed}
+			<AnimeTable
+				items={animeData.recommendationAnimeList}
+				filterPlaceholder="Filter recommendations..."
+				defaultSort="recommendation_score"
+				defaultDirection="desc"
+				showRecommendationsLink={false}
+				extraColumns={recommendationExtraColumns}
+			/>
+		{/if}
+	{/snippet}
+</AnimeSearchPanel>

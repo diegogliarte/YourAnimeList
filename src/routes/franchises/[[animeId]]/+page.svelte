@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	import AnimeTable, { type AnimeTableAnime } from '$lib/components/ui/AnimeTable.svelte';
+	import AnimeSearchPanel from '$lib/components/anime/AnimeSearchPanel.svelte';
 	import FranchiseGraph from '$lib/components/franchise/FranchiseGraph.svelte';
+	import AnimeTable, { type AnimeTableAnime } from '$lib/components/ui/AnimeTable.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import StatCard from '$lib/components/ui/StatCard.svelte';
-	import Input from '$lib/components/ui/Input.svelte';
 	import Toggle from '$lib/components/ui/Toggle.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { AnimeDetails, AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
@@ -28,11 +28,11 @@
 
 	let { params }: PageProps = $props();
 
-	let showSearch = $state(false);
 	let autoAccept = $state(false);
 	let franchiseView = $state<'list' | 'graph'>('list');
 	let pendingCollapsed = $state(false);
 	let routeStartedAnimeId = $state<number | null>(null);
+	let lastRouteAnimeId = $state<number | null | undefined>(undefined);
 
 	const autoAcceptingAnimeIds = new Set<number>();
 
@@ -45,12 +45,26 @@
 	});
 
 	$effect(() => {
-		if (!routeAnimeId) return;
-		if (routeStartedAnimeId === routeAnimeId) return;
+		const animeId = routeAnimeId;
 
-		routeStartedAnimeId = routeAnimeId;
+		if (lastRouteAnimeId === animeId) return;
 
-		void startFranchiseFromRoute(routeAnimeId);
+		lastRouteAnimeId = animeId;
+
+		if (!animeId) {
+			routeStartedAnimeId = null;
+			franchiseView = 'list';
+			pendingCollapsed = false;
+			animeData.clearFranchise();
+			animeData.clearFranchiseSearch();
+			return;
+		}
+
+		if (routeStartedAnimeId === animeId) return;
+
+		routeStartedAnimeId = animeId;
+
+		void startFranchiseFromRoute(animeId);
 	});
 
 	$effect(() => {
@@ -76,8 +90,6 @@
 
 		return entries;
 	});
-
-	const shouldShowSearch = $derived(!animeData.hasFranchise || showSearch);
 
 	const franchisePendingIds = $derived.by(() => {
 		return animeData.franchisePendingCandidates.map((candidate) => candidate.animeId);
@@ -164,13 +176,10 @@
 	});
 
 	async function startFranchiseFromRoute(animeId: number) {
-		if (animeData.franchiseSeedId === animeId && animeData.hasFranchise) {
-			showSearch = false;
-			return;
-		}
+		if (animeData.franchiseSeedId === animeId && animeData.hasFranchise) return;
 
 		animeData.clearFranchise();
-		showSearch = false;
+		animeData.clearFranchiseSearch();
 		franchiseView = 'list';
 
 		await animeData.startFranchise(animeId);
@@ -183,26 +192,30 @@
 	async function selectSearchResult(animeId: number) {
 		if (animeData.hasFranchise) {
 			await animeData.addAnimeToFranchise(animeId);
-		} else {
-			await animeData.startFranchise(animeId);
-
-			routeStartedAnimeId = animeId;
-
-			void goto(`/franchises/${animeId}`, {
-				replaceState: true,
-				noScroll: true,
-				keepFocus: true
-			});
+			animeData.clearFranchiseSearch();
+			return;
 		}
 
-		showSearch = false;
+		await animeData.startFranchise(animeId);
+
+		routeStartedAnimeId = animeId;
+		lastRouteAnimeId = animeId;
+		animeData.clearFranchiseSearch();
+
+		void goto(`/franchises/${animeId}`, {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
 	}
 
 	function startNewSearch() {
 		animeData.clearFranchise();
-		showSearch = true;
+		animeData.clearFranchiseSearch();
 		franchiseView = 'list';
+		pendingCollapsed = false;
 		routeStartedAnimeId = null;
+		lastRouteAnimeId = null;
 
 		void goto('/franchises', {
 			replaceState: true,
@@ -305,6 +318,7 @@
 		const candidates = entries
 			.filter((host) => {
 				if (host.id === target.id) return false;
+
 				return areDirectlyRelatedAnime(target.id, host.id);
 			})
 			.map((host) => getPlacementCandidate(targetStartDate, targetEndDate, host))
@@ -426,203 +440,141 @@
 	}
 </script>
 
-<div class="grid gap-4">
-	<Panel title="Franchises">
-		<div class="flex flex-wrap items-center justify-between gap-2">
-			{#if shouldShowSearch}
-				<form
-					class="flex min-w-0 flex-wrap items-center gap-2"
-					onsubmit={(event) => {
-						event.preventDefault();
-						submitSearch();
-					}}
-				>
-					<Input
-						bind:value={animeData.franchiseQuery}
-						placeholder="Search anime..."
-						class="w-60"
-						disabled={animeData.franchiseSearchLoading || animeData.franchiseCrawling}
-					/>
+<AnimeSearchPanel
+	title="Franchises"
+	bind:query={animeData.franchiseQuery}
+	results={animeData.franchiseSearchResults}
+	loading={animeData.franchiseSearchLoading}
+	error={animeData.franchiseSearchError}
+	disabled={false}
+	selectDisabled={animeData.franchiseCrawling}
+	resultsTitle={animeData.hasFranchise ? 'Add to franchise' : 'Search results'}
+	emptyText="Search for an anime, then select one result to crawl its franchise."
+	showEmpty={!animeData.hasFranchise}
+	onSearch={submitSearch}
+	onSelect={selectSearchResult}
+>
+	{#snippet actions()}
+		{#if animeData.hasFranchise}
+			<Button type="button" onclick={startNewSearch}>New franchise</Button>
 
-					<Button
-						type="submit"
-						variant="primary"
-						disabled={animeData.franchiseSearchLoading || animeData.franchiseCrawling}
-					>
-						{animeData.franchiseSearchLoading ? 'Searching...' : 'Search'}
-					</Button>
-
-					{#if animeData.hasFranchise}
-						<Button type="button" onclick={() => (showSearch = false)}>Cancel</Button>
-					{/if}
-				</form>
-			{:else}
-				<div class="flex min-w-0 flex-wrap items-center gap-2">
-					<Button type="button" variant="primary" onclick={() => (showSearch = true)}>
-						Add anime
-					</Button>
-
-					<Button type="button" onclick={startNewSearch}>New franchise</Button>
-
-					{#if animeData.franchiseCrawling}
-						<Button type="button" onclick={() => animeData.stopFranchiseCrawl()}>Stop crawl</Button>
-					{/if}
-				</div>
+			{#if animeData.franchiseCrawling}
+				<Button type="button" onclick={() => animeData.stopFranchiseCrawl()}>Stop crawl</Button>
 			{/if}
 
-			<div class="ml-auto flex flex-wrap items-center justify-end gap-2">
-				{#if animeData.hasFranchise}
-					<div class="flex items-center gap-1">
-						<Button
-							type="button"
-							variant={franchiseView === 'list' ? 'primary' : 'default'}
-							onclick={() => (franchiseView = 'list')}
-						>
-							List
-						</Button>
+			<div class="flex items-center gap-1">
+				<Button
+					type="button"
+					variant={franchiseView === 'list' ? 'primary' : 'default'}
+					onclick={() => (franchiseView = 'list')}
+				>
+					List
+				</Button>
 
-						<Button
-							type="button"
-							variant={franchiseView === 'graph' ? 'primary' : 'default'}
-							onclick={() => (franchiseView = 'graph')}
-						>
-							Graph
-						</Button>
-					</div>
-				{/if}
-
-				<Toggle bind:checked={autoAccept} label="Auto accept" />
+				<Button
+					type="button"
+					variant={franchiseView === 'graph' ? 'primary' : 'default'}
+					onclick={() => (franchiseView = 'graph')}
+				>
+					Graph
+				</Button>
 			</div>
-		</div>
-	</Panel>
 
-	{#if shouldShowSearch && animeData.franchiseSearchResults.length > 0}
-		<Panel title={animeData.hasFranchise ? 'Add to franchise' : 'Search results'}>
-			<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-				{#each animeData.franchiseSearchResults as result (result.node.id)}
-					<button
-						type="button"
-						class="flex cursor-pointer gap-3 rounded-md border border-border bg-surface p-2 text-left transition hover:border-primary hover:bg-surface-soft"
-						disabled={animeData.franchiseCrawling}
-						onclick={() => selectSearchResult(result.node.id)}
-					>
-						{#if result.node.main_picture?.medium}
-							<img
-								src={result.node.main_picture.medium}
-								alt={result.node.title}
-								class="size-12 shrink-0 rounded-md object-cover"
-							/>
-						{:else}
-							<div class="size-12 shrink-0 rounded-md bg-surface-soft"></div>
-						{/if}
+			<Toggle bind:checked={autoAccept} label="Auto accept" />
+		{/if}
+	{/snippet}
 
-						<div class="min-w-0">
-							<p class="truncate text-sm font-medium text-text">{result.node.title}</p>
-							<p class="mt-1 text-xs text-text-muted">
-								{result.node.media_type ?? 'unknown'} · {formatSeason(result)}
-							</p>
-						</div>
-					</button>
+	{#snippet children()}
+		{#if animeData.hasFranchise}
+			<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+				{#each franchiseStats as stat (stat.label)}
+					<StatCard label={stat.label} value={stat.value} hint={stat.hint} />
 				{/each}
 			</div>
-		</Panel>
-	{/if}
+		{/if}
 
-	{#if animeData.hasFranchise}
-		<div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-			{#each franchiseStats as stat (stat.label)}
-				<StatCard label={stat.label} value={stat.value} hint={stat.hint} />
-			{/each}
-		</div>
-	{/if}
-
-	{#if animeData.franchisePendingList.length > 0}
-		<Panel
-			title={`Pending relations (${animeData.franchisePendingList.length})`}
-			collapsible
-			bind:collapsed={pendingCollapsed}
-		>
-			<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-				{#each animeData.franchisePendingList as candidate (candidate.animeId)}
-					<div class="rounded-md border border-border bg-surface p-2">
-						<div class="flex gap-3">
-							{#if candidate.imageUrl}
-								<img
-									src={candidate.imageUrl}
-									alt={candidate.title}
-									class="size-12 shrink-0 rounded-md object-cover"
-								/>
-							{:else}
-								<div class="size-12 shrink-0 rounded-md bg-surface-soft"></div>
-							{/if}
-
-							<div class="min-w-0 flex-1">
-								<a
-									href={getAnimeUrl(candidate.animeId)}
-									target="_blank"
-									rel="noreferrer"
-									class="block truncate text-sm font-medium text-text hover:text-primary"
-								>
-									{candidate.title}
-								</a>
-
-								<p class="mt-1 text-xs text-text-muted">
-									{candidate.relationLabel}
-								</p>
-
-								{#if animeData.franchiseAnimeById[candidate.fromId]}
-									<p class="mt-1 truncate text-xs text-text-muted">
-										from {animeData.franchiseAnimeById[candidate.fromId].title}
-									</p>
+		{#if animeData.franchisePendingList.length > 0}
+			<Panel
+				title={`Pending relations (${animeData.franchisePendingList.length})`}
+				collapsible
+				bind:collapsed={pendingCollapsed}
+			>
+				<div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+					{#each animeData.franchisePendingList as candidate (candidate.animeId)}
+						<div class="rounded-md border border-border bg-surface p-2">
+							<div class="flex gap-3">
+								{#if candidate.imageUrl}
+									<img
+										src={candidate.imageUrl}
+										alt={candidate.title}
+										class="size-12 shrink-0 rounded-md object-cover"
+									/>
+								{:else}
+									<div class="size-12 shrink-0 rounded-md bg-surface-soft"></div>
 								{/if}
+
+								<div class="min-w-0 flex-1">
+									<a
+										href={getAnimeUrl(candidate.animeId)}
+										target="_blank"
+										rel="noreferrer"
+										class="block truncate text-sm font-medium text-text hover:text-primary"
+									>
+										{candidate.title}
+									</a>
+
+									<p class="mt-1 text-xs text-text-muted">
+										{candidate.relationLabel}
+									</p>
+
+									{#if animeData.franchiseAnimeById[candidate.fromId]}
+										<p class="mt-1 truncate text-xs text-text-muted">
+											from {animeData.franchiseAnimeById[candidate.fromId].title}
+										</p>
+									{/if}
+								</div>
+							</div>
+
+							<div class="mt-2 flex gap-2">
+								<Button
+									type="button"
+									variant="primary"
+									onclick={() => animeData.acceptFranchiseCandidate(candidate.animeId)}
+								>
+									Accept
+								</Button>
+
+								<Button
+									type="button"
+									onclick={() => animeData.rejectFranchiseCandidate(candidate.animeId)}
+								>
+									Reject
+								</Button>
 							</div>
 						</div>
-
-						<div class="mt-2 flex gap-2">
-							<Button
-								type="button"
-								variant="primary"
-								onclick={() => animeData.acceptFranchiseCandidate(candidate.animeId)}
-							>
-								Accept
-							</Button>
-
-							<Button
-								type="button"
-								onclick={() => animeData.rejectFranchiseCandidate(candidate.animeId)}
-							>
-								Reject
-							</Button>
-						</div>
-					</div>
-				{/each}
-			</div>
-		</Panel>
-	{/if}
-
-	{#if animeData.hasFranchise}
-		{#if franchiseView === 'graph'}
-			<FranchiseGraph
-				animes={franchiseGraphAnimeList}
-				relations={animeData.franchiseRelations}
-				seedId={animeData.franchiseSeedId}
-				pendingIds={franchisePendingIds}
-				{getUserStatus}
-				{getSubtitle}
-			/>
-		{:else}
-			<AnimeTable
-				items={animeData.franchiseAnimeList}
-				filterPlaceholder="Filter franchise..."
-				getSubtitleExtra={getWatchHintForTableItem}
-				showFranchiseLink={false}
-			/>
+					{/each}
+				</div>
+			</Panel>
 		{/if}
-	{:else if !animeData.franchiseSearchResults.length}
-		<Panel>
-			<p class="text-sm text-text-muted">
-				Search for an anime, then select one result to crawl its franchise.
-			</p>
-		</Panel>
-	{/if}
-</div>
+
+		{#if animeData.hasFranchise}
+			{#if franchiseView === 'graph'}
+				<FranchiseGraph
+					animes={franchiseGraphAnimeList}
+					relations={animeData.franchiseRelations}
+					seedId={animeData.franchiseSeedId}
+					pendingIds={franchisePendingIds}
+					{getUserStatus}
+					{getSubtitle}
+				/>
+			{:else}
+				<AnimeTable
+					items={animeData.franchiseAnimeList}
+					filterPlaceholder="Filter franchise..."
+					getSubtitleExtra={getWatchHintForTableItem}
+					showFranchiseLink={false}
+				/>
+			{/if}
+		{/if}
+	{/snippet}
+</AnimeSearchPanel>
