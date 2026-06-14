@@ -181,7 +181,6 @@
 				filterPlaceholder="Filter recommendations..."
 				defaultSort="recommendation_score"
 				defaultDirection="desc"
-				showRecommendationsLink={false}
 				extraColumns={recommendationExtraColumns}
 			/>
 		{/if}
