@@ -52,6 +52,7 @@
 		id: number | null;
 		title: string;
 		url: string | null;
+		franchiseUrl: string | null;
 		imageUrl: string | null;
 		subtitle: string;
 		subtitleExtra: string | null;
@@ -84,6 +85,7 @@
 		filterPlaceholder?: string;
 		showFilter?: boolean;
 		showColumnControls?: boolean;
+		showFranchiseLink?: boolean;
 		getSubtitleExtra?: (item: AnimeTableAnime) => string | null | undefined;
 		class?: string;
 	};
@@ -126,6 +128,7 @@
 		filterPlaceholder = 'Filter anime...',
 		showFilter = true,
 		showColumnControls = true,
+		showFranchiseLink = true,
 		getSubtitleExtra,
 		class: className = ''
 	}: Props = $props();
@@ -215,9 +218,6 @@
 
 		const subtitle = [
 			label(getMediaType(item)),
-			isDbEntry(item) ? label(item.source) : null,
-			isDbEntry(item) ? label(item.rating) : null,
-			!isDbEntry(item) ? seasonText : null,
 			episodes ? `${formatNumber(episodes)} eps` : null,
 			averageDuration ? `${formatDuration(averageDuration)}/ep` : null,
 			totalDuration ? formatDuration(totalDuration) : null
@@ -276,6 +276,7 @@
 			id,
 			title,
 			url: getUrl(item, id),
+			franchiseUrl: getFranchiseUrl(id),
 			imageUrl: getImageUrl(item),
 			subtitle,
 			subtitleExtra,
@@ -412,6 +413,10 @@
 		if (isDbEntry(item)) return item.malUrl ?? null;
 
 		return id ? getAnimeUrl(id) : null;
+	}
+
+	function getFranchiseUrl(id: number | null) {
+		return showFranchiseLink && id ? `/franchises/${id}` : null;
 	}
 
 	function getImageUrl(item: AnimeTableAnime) {
@@ -702,46 +707,91 @@
 						{#each visibleColumns as column (column.value)}
 							{#if column.value === 'title'}
 								<td class="max-w-96 px-3 py-2">
-									<a
-										href={row.url ?? undefined}
-										target={row.url ? '_blank' : undefined}
-										rel={row.url ? 'noreferrer' : undefined}
-										class={`flex min-w-0 items-center gap-3 text-text transition ${
-												row.url ? 'hover:text-primary' : 'cursor-default'
-											}`}
-									>
-										{#if row.imageUrl}
-											<img
-												src={row.imageUrl}
-												alt={row.title}
-												class="size-9 shrink-0 rounded-md object-cover"
-											/>
+									<div class="group flex min-w-0 items-center gap-3 text-text">
+										{#if row.url}
+											<a href={row.url} target="_blank" rel="noreferrer" class="shrink-0">
+												{#if row.imageUrl}
+													<img
+														src={row.imageUrl}
+														alt={row.title}
+														class="size-9 rounded-md object-cover"
+													/>
+												{:else}
+													<div class="size-9 rounded-md bg-surface-soft"></div>
+												{/if}
+											</a>
 										{:else}
-											<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
+											{#if row.imageUrl}
+												<img
+													src={row.imageUrl}
+													alt={row.title}
+													class="size-9 shrink-0 rounded-md object-cover"
+												/>
+											{:else}
+												<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
+											{/if}
 										{/if}
 
-										<div class="min-w-0">
-											<span class="block truncate font-medium">{row.title}</span>
+										<div class="min-w-0 flex-1">
+											{#if row.url}
+												<a
+													href={row.url}
+													target="_blank"
+													rel="noreferrer"
+													class="block truncate font-medium transition hover:text-primary"
+												>
+													{row.title}
+												</a>
+											{:else}
+												<span class="block truncate font-medium">{row.title}</span>
+											{/if}
 
-											{#if row.subtitle || row.userStatus}
-	<span class="flex min-w-0 items-center gap-1 text-xs text-text-muted">
-		{#if row.userStatus}
-			<StatusBadge class="mt-0.5" status={row.userStatus} />
-		{/if}
+											{#if row.subtitle || row.userStatus || row.franchiseUrl}
+												<div class="flex min-w-0 items-center gap-2 text-xs text-text-muted">
+						<span class="flex min-w-0 items-center gap-1">
+							{#if row.userStatus}
+								<StatusBadge class="mt-0.5" status={row.userStatus} />
+							{/if}
 
-		{#if row.subtitle}
-			<span class="truncate">{row.subtitle}</span>
-		{/if}
-	</span>
+							{#if row.subtitle}
+								<span class="truncate">{row.subtitle}</span>
+							{/if}
+						</span>
+
+													{#if row.franchiseUrl}
+							<span
+								class="
+									pointer-events-none hidden shrink-0 items-center gap-1 opacity-0 transition
+									group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100
+									group-focus-within:pointer-events-auto group-focus-within:flex group-focus-within:opacity-100
+								"
+							>
+								<a
+									href={row.franchiseUrl}
+									target="_blank"
+									rel="noreferrer"
+									class="
+										rounded border border-border px-1 py-0.5 text-[10px] leading-none text-text-muted
+										transition hover:border-primary hover:text-primary
+										focus:opacity-100
+									"
+									title={`Open franchise for ${row.title}`}
+									aria-label={`Open franchise for ${row.title}`}
+								>
+									Franchise
+								</a>
+							</span>
+													{/if}
+												</div>
 											{/if}
 
 											{#if row.subtitleExtra}
-	<span class="block truncate text-[10px] text-text-muted">
-		{row.subtitleExtra}
-	</span>
+					<span class="block truncate text-[10px] text-text-muted">
+						{row.subtitleExtra}
+					</span>
 											{/if}
 										</div>
-									</a>
+									</div>
 								</td>
 							{:else if column.value === 'relation'}
 								<td class="px-3 py-2 text-text-soft">

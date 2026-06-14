@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import AnimeTable, { type AnimeTableAnime } from '$lib/components/ui/AnimeTable.svelte';
 	import FranchiseGraph from '$lib/components/franchise/FranchiseGraph.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
@@ -10,6 +11,7 @@
 	import type { AnimeDetails, AnimeListStatusName, UserAnimeListEdge } from '$lib/types/anime';
 	import { compareAnimeRelease, formatSeason, getAnimeUrl } from '$lib/utils/anime.utils';
 	import { formatDecimal, formatDuration, formatNumber } from '$lib/utils/format.utils';
+	import type { PageProps } from './$types';
 
 	type Stat = {
 		label: string;
@@ -24,12 +26,32 @@
 		spanDays: number;
 	};
 
+	let { params }: PageProps = $props();
+
 	let showSearch = $state(false);
 	let autoAccept = $state(false);
 	let franchiseView = $state<'list' | 'graph'>('list');
 	let pendingCollapsed = $state(false);
+	let routeStartedAnimeId = $state<number | null>(null);
 
 	const autoAcceptingAnimeIds = new Set<number>();
+
+	const routeAnimeId = $derived.by(() => {
+		const raw = params.animeId;
+
+		if (!raw || !/^\d+$/.test(raw)) return null;
+
+		return Number(raw);
+	});
+
+	$effect(() => {
+		if (!routeAnimeId) return;
+		if (routeStartedAnimeId === routeAnimeId) return;
+
+		routeStartedAnimeId = routeAnimeId;
+
+		void startFranchiseFromRoute(routeAnimeId);
+	});
 
 	$effect(() => {
 		if (!autoAccept) return;
@@ -139,6 +161,19 @@
 		];
 	});
 
+	async function startFranchiseFromRoute(animeId: number) {
+		if (animeData.franchiseSeedId === animeId && animeData.hasFranchise) {
+			showSearch = false;
+			return;
+		}
+
+		animeData.clearFranchise();
+		showSearch = false;
+		franchiseView = 'list';
+
+		await animeData.startFranchise(animeId);
+	}
+
 	function submitSearch() {
 		void animeData.searchFranchiseAnime();
 	}
@@ -148,6 +183,14 @@
 			await animeData.addAnimeToFranchise(animeId);
 		} else {
 			await animeData.startFranchise(animeId);
+
+			routeStartedAnimeId = animeId;
+
+			void goto(`/franchises/${animeId}`, {
+				replaceState: true,
+				noScroll: true,
+				keepFocus: true
+			});
 		}
 
 		showSearch = false;
@@ -157,6 +200,13 @@
 		animeData.clearFranchise();
 		showSearch = true;
 		franchiseView = 'list';
+		routeStartedAnimeId = null;
+
+		void goto('/franchises', {
+			replaceState: true,
+			noScroll: true,
+			keepFocus: true
+		});
 	}
 
 	function getUserEntry(animeId: number) {
@@ -240,14 +290,7 @@
 	}
 
 	function shouldEstimateWatchPlacement(anime: AnimeDetails) {
-		return [
-			'movie',
-			'special',
-			'tv_special',
-			'ova',
-			'ona',
-			'cm'
-		].includes(anime.media_type ?? '');
+		return ['movie', 'special', 'tv_special', 'ova', 'ona', 'cm'].includes(anime.media_type ?? '');
 	}
 
 	function findWatchPlacement(target: AnimeDetails, entries: AnimeDetails[]) {
@@ -569,6 +612,7 @@
 				items={animeData.franchiseAnimeList}
 				filterPlaceholder="Filter franchise..."
 				getSubtitleExtra={getWatchHintForTableItem}
+				showFranchiseLink={false}
 			/>
 		{/if}
 	{:else if !animeData.franchiseSearchResults.length}
