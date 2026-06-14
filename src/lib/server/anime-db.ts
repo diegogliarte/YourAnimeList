@@ -50,6 +50,7 @@ export type AnimeDbRecommendationRoot = {
 
 export type AnimeDbRecommendationResult = {
 	anime: unknown;
+	kind: 'seed' | 'direct' | 'related';
 	score: number;
 	sourceCount: number;
 	totalCount: number;

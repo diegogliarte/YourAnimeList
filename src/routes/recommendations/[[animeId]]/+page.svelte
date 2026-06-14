@@ -9,7 +9,6 @@
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import { formatSeason } from '$lib/utils/anime.utils';
-	import { formatNumber } from '$lib/utils/format.utils';
 	import type { PageProps } from './$types';
 
 	let { params }: PageProps = $props();
@@ -18,10 +17,26 @@
 
 	const recommendationExtraColumns: AnimeTableExtraColumn[] = [
 		{
+			label: 'Rec Type',
+			value: 'recommendation_kind',
+			align: 'center',
+			width: '6rem',
+			getCell: getRecommendationKind,
+			getSort: getRecommendationKindSort
+		},
+		{
+			label: 'Rec Score',
+			value: 'recommendation_score',
+			align: 'center',
+			width: '5rem',
+			getCell: getRecommendationScore,
+			getSort: getRecommendationScore
+		},
+		{
 			label: 'Recs',
 			value: 'recommendation_total',
 			align: 'center',
-			width: '3rem',
+			width: '5rem',
 			getCell: getRecommendationTotal,
 			getSort: getRecommendationTotal
 		},
@@ -29,17 +44,9 @@
 			label: 'Sources',
 			value: 'recommendation_sources',
 			align: 'center',
-			width: '3rem',
+			width: '5rem',
 			getCell: getRecommendationSourceCount,
 			getSort: getRecommendationSourceCount
-		},
-		{
-			label: 'Rec Score',
-			value: 'recommendation_score',
-			align: 'center',
-			width: '3rem',
-			getCell: getRecommendationScore,
-			getSort: getRecommendationScore
 		}
 	];
 
@@ -94,16 +101,48 @@
 		return animeData.recommendationResults.find((entry) => entry.anime.id === id) ?? null;
 	}
 
+	function getRecommendationKind(item: AnimeTableAnime) {
+		const kind = getRecommendationForItem(item)?.kind;
+
+		if (kind === 'seed') return 'Seed';
+		if (kind === 'direct') return 'Direct';
+		if (kind === 'related') return 'Related';
+
+		return null;
+	}
+
+	function getRecommendationKindSort(item: AnimeTableAnime) {
+		const kind = getRecommendationForItem(item)?.kind;
+
+		if (kind === 'seed') return 0;
+		if (kind === 'direct') return 1;
+		if (kind === 'related') return 2;
+
+		return null;
+	}
+
 	function getRecommendationScore(item: AnimeTableAnime) {
-		return getRecommendationForItem(item)?.score ?? null;
+		const result = getRecommendationForItem(item);
+
+		if (!result || result.kind === 'seed') return null;
+
+		return result.score;
 	}
 
 	function getRecommendationTotal(item: AnimeTableAnime) {
-		return getRecommendationForItem(item)?.totalCount ?? null;
+		const result = getRecommendationForItem(item);
+
+		if (!result || result.kind === 'seed') return null;
+
+		return result.totalCount;
 	}
 
 	function getRecommendationSourceCount(item: AnimeTableAnime) {
-		return getRecommendationForItem(item)?.sourceCount ?? null;
+		const result = getRecommendationForItem(item);
+
+		if (!result || result.kind === 'seed') return null;
+
+		return result.sourceCount;
 	}
 </script>
 
@@ -136,15 +175,6 @@
 					<Button type="button" onclick={startNewSearch}>New search</Button>
 				{/if}
 			</form>
-
-			{#if animeData.recommendationSeed}
-				<p class="text-xs text-text-muted">
-					Seed: {animeData.recommendationSeed.title} · {formatNumber(
-						animeData.recommendationResults.length
-					)}
-					results
-				</p>
-			{/if}
 		</div>
 	</Panel>
 
@@ -196,10 +226,9 @@
 		<AnimeTable
 			items={animeData.recommendationAnimeList}
 			filterPlaceholder="Filter recommendations..."
-			defaultSort="season"
-			defaultDirection="asc"
+			defaultSort="recommendation_score"
+			defaultDirection="desc"
 			extraColumns={recommendationExtraColumns}
-			showRecommendationsLink={false}
 		/>
 	{:else if !animeData.recommendationSearchResults.length}
 		<Panel>

@@ -50,6 +50,7 @@ type RecommendationSource = {
 	animeId: number;
 	title: string;
 	count: number;
+	rootCount: number;
 };
 
 type RecommendationBranch = {
@@ -66,6 +67,7 @@ type RecommendationRoot = {
 
 type RecommendationResult = {
 	anime: AnimeDbEntry;
+	kind: 'seed' | 'direct' | 'related';
 	score: number;
 	sourceCount: number;
 	totalCount: number;
@@ -400,7 +402,7 @@ class AnimeDataStore {
 		}
 	}
 
-	async loadRecommendations(seedId: number, roots = 5, branch = 3, minSources = 2) {
+	async loadRecommendations(seedId: number) {
 		const currentRequestId = ++this.recommendationRequestId;
 
 		this.recommendationSeedId = seedId;
@@ -408,13 +410,7 @@ class AnimeDataStore {
 		this.recommendationError = null;
 
 		try {
-			const params = new URLSearchParams({
-				roots: String(roots),
-				branch: String(branch),
-				minSources: String(minSources)
-			});
-
-			const response = await fetch(`/api/mal/anime/recommendations/${seedId}?${params.toString()}`);
+			const response = await fetch(`/api/mal/anime/recommendations/${seedId}`);
 
 			if (!response.ok) {
 				const message = await response.text();

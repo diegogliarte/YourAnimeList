@@ -242,8 +242,6 @@
 
 		const subtitle = [
 			label(getMediaType(item)),
-			isDbEntry(item) ? label(item.source) : null,
-			isDbEntry(item) ? label(item.rating) : null,
 			!isDbEntry(item) ? seasonText : null,
 			episodes ? `${formatNumber(episodes)} eps` : null,
 			averageDuration ? `${formatDuration(averageDuration)}/ep` : null,
