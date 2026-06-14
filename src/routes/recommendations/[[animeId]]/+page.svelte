@@ -20,7 +20,7 @@
 			label: 'Rec Type',
 			value: 'recommendation_kind',
 			align: 'center',
-			width: '6rem',
+			width: '5rem',
 			getCell: getRecommendationKind,
 			getSort: getRecommendationKindSort
 		},
@@ -39,14 +39,6 @@
 			width: '5rem',
 			getCell: getRecommendationTotal,
 			getSort: getRecommendationTotal
-		},
-		{
-			label: 'Sources',
-			value: 'recommendation_sources',
-			align: 'center',
-			width: '5rem',
-			getCell: getRecommendationSourceCount,
-			getSort: getRecommendationSourceCount
 		}
 	];
 
@@ -135,14 +127,6 @@
 		if (!result || result.kind === 'seed') return null;
 
 		return result.totalCount;
-	}
-
-	function getRecommendationSourceCount(item: AnimeTableAnime) {
-		const result = getRecommendationForItem(item);
-
-		if (!result || result.kind === 'seed') return null;
-
-		return result.sourceCount;
 	}
 </script>
 
