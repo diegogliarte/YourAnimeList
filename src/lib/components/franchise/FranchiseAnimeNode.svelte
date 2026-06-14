@@ -61,7 +61,7 @@
 				href={getAnimeUrl(data.anime.id)}
 				target="_blank"
 				rel="noreferrer"
-				class="nodrag block truncate text-sm font-semibold leading-snug text-text hover:text-primary"
+				class="nodrag block truncate text-sm leading-snug font-semibold text-text hover:text-primary"
 			>
 				{data.anime.title}
 			</a>
@@ -76,7 +76,9 @@
 				{/if}
 
 				{#if data.isPending}
-					<span class="rounded-md border border-yellow-500/60 px-1.5 py-0.5 text-[10px] text-yellow-400">
+					<span
+						class="rounded-md border border-yellow-500/60 px-1.5 py-0.5 text-[10px] text-yellow-400"
+					>
 						Pending
 					</span>
 				{/if}

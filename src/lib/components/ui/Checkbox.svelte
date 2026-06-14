@@ -23,19 +23,13 @@
 <label
 	class={`
 		inline-flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1
-		text-xs text-text-soft outline-none transition
+		text-xs text-text-soft transition outline-none
 		 hover:text-text
 		${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}
 		${className}
 	`}
 >
-	<input
-		type="checkbox"
-		bind:checked
-		{disabled}
-		onchange={handleChange}
-		class="peer sr-only"
-	/>
+	<input type="checkbox" bind:checked {disabled} onchange={handleChange} class="peer sr-only" />
 
 	<span
 		class="

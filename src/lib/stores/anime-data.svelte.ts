@@ -18,11 +18,7 @@ import {
 	EXCLUDED_FRANCHISE_RELATIONS,
 	INCLUDED_FRANCHISE_RELATIONS
 } from '$lib/utils/anime.utils';
-import {
-	getIndexedCache,
-	removeIndexedCache,
-	setIndexedCache
-} from '$lib/utils/indexed-db.utils';
+import { getIndexedCache, removeIndexedCache, setIndexedCache } from '$lib/utils/indexed-db.utils';
 
 const STORAGE_KEY = 'your-anime-list:data';
 
@@ -149,7 +145,10 @@ class AnimeDataStore {
 		this.userListError = null;
 
 		try {
-			const response = await fetch(`/api/mal/users/${encodeURIComponent(cleanUsername)}/animelist`, {cache: 'no-store'});
+			const response = await fetch(
+				`/api/mal/users/${encodeURIComponent(cleanUsername)}/animelist`,
+				{ cache: 'no-store' }
+			);
 
 			if (!response.ok) {
 				const message = await response.text();
@@ -487,7 +486,7 @@ class AnimeDataStore {
 				this.franchiseQueue.length > 0 &&
 				!this.franchiseStopRequested &&
 				runId === this.franchiseRunId
-				) {
+			) {
 				const animeId = this.franchiseQueue[0];
 
 				this.franchiseQueue = this.franchiseQueue.slice(1);

@@ -14,11 +14,7 @@
 	import '@xyflow/svelte/dist/style.css';
 
 	import FranchiseAnimeNode from '$lib/components/franchise/FranchiseAnimeNode.svelte';
-	import type {
-		AnimeDetails,
-		AnimeListStatusName,
-		FranchiseRelation
-	} from '$lib/types/anime';
+	import type { AnimeDetails, AnimeListStatusName, FranchiseRelation } from '$lib/types/anime';
 
 	type Props = {
 		animes: AnimeDetails[];

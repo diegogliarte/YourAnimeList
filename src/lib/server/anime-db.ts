@@ -54,7 +54,6 @@ export async function tryFetchAnimeDbFranchise(
 			signal: controller.signal
 		});
 
-
 		if (!response.ok) return null;
 
 		const result = (await response.json()) as AnimeDbFranchiseResponse;

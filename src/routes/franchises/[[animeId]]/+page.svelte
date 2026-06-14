@@ -99,7 +99,9 @@
 	const franchiseStats = $derived.by<Stat[]>(() => {
 		const entries = animeData.franchiseAnimeList;
 
-		const completedCount = entries.filter((anime) => getUserStatus(anime.id) === 'completed').length;
+		const completedCount = entries.filter(
+			(anime) => getUserStatus(anime.id) === 'completed'
+		).length;
 
 		const knownEpisodeEntries = entries.filter((anime) => (anime.num_episodes ?? 0) > 0);
 		const totalEpisodes = knownEpisodeEntries.reduce(
@@ -604,8 +606,8 @@
 				relations={animeData.franchiseRelations}
 				seedId={animeData.franchiseSeedId}
 				pendingIds={franchisePendingIds}
-				getUserStatus={getUserStatus}
-				getSubtitle={getSubtitle}
+				{getUserStatus}
+				{getSubtitle}
 			/>
 		{:else}
 			<AnimeTable

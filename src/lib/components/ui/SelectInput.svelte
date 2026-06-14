@@ -34,7 +34,7 @@
 		{disabled}
 		class="
 			w-full min-w-0 truncate rounded-md border border-border bg-surface px-1 py-1.5
-			text-sm text-text outline-none transition
+			text-sm text-text transition outline-none
 			hover:border-primary/70 hover:bg-surface-soft
 			focus:border-primary
 			disabled:cursor-not-allowed disabled:opacity-60

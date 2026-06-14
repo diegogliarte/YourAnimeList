@@ -38,7 +38,7 @@
 			<div class="flex min-h-7 items-center justify-between gap-3">
 				<div class="min-w-0">
 					{#if title}
-						<h2 class="truncate text-sm font-semibold leading-7 text-text">{title}</h2>
+						<h2 class="truncate text-sm leading-7 font-semibold text-text">{title}</h2>
 					{/if}
 
 					{#if description}
@@ -47,10 +47,7 @@
 				</div>
 
 				{#if collapsible}
-					<Button
-						type="button"
-						onclick={toggleCollapsed}
-					>
+					<Button type="button" onclick={toggleCollapsed}>
 						{collapsed ? 'Expand' : 'Collapse'}
 					</Button>
 				{/if}

@@ -194,7 +194,7 @@
 		error = null;
 
 		try {
-			const result = await fetchAnimeDbPage(getFilters(reset ? 0 : nextOffset ?? 0));
+			const result = await fetchAnimeDbPage(getFilters(reset ? 0 : (nextOffset ?? 0)));
 
 			if (currentRequestId !== requestId) return;
 
@@ -348,9 +348,7 @@
 				<div class="flex min-w-0 flex-wrap items-center gap-2">
 					<Input bind:value={query} placeholder="Search anime..." class="w-60 max-w-full" />
 
-					<Button type="button" onclick={resetFilters} disabled={loading}>
-						Reset
-					</Button>
+					<Button type="button" onclick={resetFilters} disabled={loading}>Reset</Button>
 
 					{#if loading}
 						<span class="text-xs text-text-muted">Updating...</span>
@@ -507,12 +505,7 @@
 				<div class="grid min-w-0 grid-cols-2 gap-2">
 					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
 						<span>Episodes min</span>
-						<Input
-							bind:value={episodesMin}
-							type="number"
-							placeholder="1"
-							class="w-full min-w-0"
-						/>
+						<Input bind:value={episodesMin} type="number" placeholder="1" class="w-full min-w-0" />
 					</label>
 
 					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
@@ -529,12 +522,7 @@
 				<div class="grid min-w-0 grid-cols-2 gap-2">
 					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
 						<span>List users min</span>
-						<Input
-							bind:value={usersMin}
-							type="number"
-							placeholder="0"
-							class="w-full min-w-0"
-						/>
+						<Input bind:value={usersMin} type="number" placeholder="0" class="w-full min-w-0" />
 					</label>
 
 					<label class="grid min-w-0 gap-1 text-xs text-text-muted">
@@ -571,7 +559,7 @@
 		</div>
 
 		<div class="min-w-0">
-			<AnimeTable items={items} showFilter={false} />
+			<AnimeTable {items} showFilter={false} />
 		</div>
 
 		{#if loadingMore}

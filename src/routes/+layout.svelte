@@ -39,7 +39,7 @@
 	<Navbar />
 
 	<main class="min-h-0 min-w-0 flex-1 overflow-y-auto">
-		<div class="mx-auto w-full min-w-0 max-w-6xl px-4 py-8">
+		<div class="mx-auto w-full max-w-6xl min-w-0 px-4 py-8">
 			{@render children()}
 		</div>
 	</main>

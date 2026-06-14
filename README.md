@@ -14,11 +14,11 @@ Load a MyAnimeList username.
 
 Then you get:
 
-* List
-* Stats
-* Top Anime
-* Franchises
-* All Anime
+- List
+- Stats
+- Top Anime
+- Franchises
+- All Anime
 
 ## List
 
@@ -34,10 +34,10 @@ Personal stats from the loaded MAL user.
 
 Also has small showcases like:
 
-* Hidden gems
-* Hot takes
-* Most obscure
-* Popular misses
+- Hidden gems
+- Hot takes
+- Most obscure
+- Popular misses
 
 Anime homework, but with cards.
 
@@ -47,15 +47,15 @@ Uses MAL rankings.
 
 Supports:
 
-* Top
-* Airing
-* Upcoming
-* TV
-* Movies
-* OVA
-* Specials
-* Popular
-* Favorites
+- Top
+- Airing
+- Upcoming
+- TV
+- Movies
+- OVA
+- Specials
+- Popular
+- Favorites
 
 You can also exclude anime already in your own list.
 
@@ -93,16 +93,16 @@ This page supports filtering/sorting the full anime database with infinite scrol
 
 Examples:
 
-* oldest anime
-* lowest MAL mean
-* most obscure
-* most popular
-* by media type
-* by genre
-* by studio
-* by year
-* by episodes
-* by score range
+- oldest anime
+- lowest MAL mean
+- most obscure
+- most popular
+- by media type
+- by genre
+- by studio
+- by year
+- by episodes
+- by score range
 
 If the Pi is down, the page just says the DB is down.
 

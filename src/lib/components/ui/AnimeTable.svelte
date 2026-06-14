@@ -7,11 +7,7 @@
 	} from '$lib/types/anime';
 	import type { AnimeDbEntry } from '$lib/types/anime-db';
 
-	export type AnimeTableAnime =
-		| UserAnimeListEdge
-		| AnimeRankingEdge
-		| AnimeDetails
-		| AnimeDbEntry;
+	export type AnimeTableAnime = UserAnimeListEdge | AnimeRankingEdge | AnimeDetails | AnimeDbEntry;
 
 	type SortDirection = 'asc' | 'desc';
 
@@ -78,7 +74,12 @@
 		getProgressValue,
 		getSeasonValue
 	} from '$lib/utils/anime.utils';
-	import { formatDecimal, formatDuration, formatLabel, formatNumber } from '$lib/utils/format.utils';
+	import {
+		formatDecimal,
+		formatDuration,
+		formatLabel,
+		formatNumber
+	} from '$lib/utils/format.utils';
 
 	type Props = {
 		items: AnimeTableAnime[];
@@ -342,14 +343,22 @@
 	}
 
 	function getFilterText(row: AnimeRow) {
-		return [row.title, row.subtitle, row.subtitleExtra, row.relationSource, ...Object.values(row.cells)]
+		return [
+			row.title,
+			row.subtitle,
+			row.subtitleExtra,
+			row.relationSource,
+			...Object.values(row.cells)
+		]
 			.filter(Boolean)
 			.join(' ');
 	}
 
 	function getDefaultHiddenColumns() {
 		return columns
-			.filter((column) => column.hideable !== false && !defaultVisibleColumns.includes(column.value))
+			.filter(
+				(column) => column.hideable !== false && !defaultVisibleColumns.includes(column.value)
+			)
 			.map((column) => column.value);
 	}
 
@@ -439,9 +448,9 @@
 
 		return relations.length
 			? relations
-				.slice(0, 2)
-				.map((relation) => relation.relationLabel)
-				.join(', ')
+					.slice(0, 2)
+					.map((relation) => relation.relationLabel)
+					.join(', ')
 			: null;
 	}
 
@@ -646,7 +655,9 @@
 	}
 </script>
 
-<div class={`min-w-0 max-w-full overflow-hidden rounded-md border border-border bg-surface ${className}`}>
+<div
+	class={`max-w-full min-w-0 overflow-hidden rounded-md border border-border bg-surface ${className}`}
+>
 	{#if showFilter || showColumnControls}
 		<div class="grid min-w-0 gap-2 border-b border-border bg-surface p-2">
 			{#if showFilter}
@@ -668,7 +679,7 @@
 		</div>
 	{/if}
 
-	<div class="min-w-0 max-w-full overflow-x-auto">
+	<div class="max-w-full min-w-0 overflow-x-auto">
 		<table class="table-fixed border-collapse text-sm" style:width={tableWidth}>
 			<colgroup>
 				{#each visibleColumns as column (column.value)}
@@ -677,51 +688,50 @@
 			</colgroup>
 
 			<thead class="bg-surface-soft text-xs text-text-muted">
-			<tr>
-				{#each visibleColumns as column (column.value)}
-					<th class={`px-3 py-2 font-medium whitespace-nowrap ${alignClass(column.align)}`}>
-						<button
-							type="button"
-							class="inline-flex cursor-pointer items-center gap-1 text-inherit transition hover:text-text"
-							onclick={() => toggleSort(column)}
-						>
-							<span>{column.label}</span>
+				<tr>
+					{#each visibleColumns as column (column.value)}
+						<th class={`px-3 py-2 font-medium whitespace-nowrap ${alignClass(column.align)}`}>
+							<button
+								type="button"
+								class="inline-flex cursor-pointer items-center gap-1 text-inherit transition hover:text-text"
+								onclick={() => toggleSort(column)}
+							>
+								<span>{column.label}</span>
 
-							<span
-								class={`inline-block w-3 text-right text-primary ${
+								<span
+									class={`inline-block w-3 text-right text-primary ${
 										selectedSort === column.value ? 'opacity-100' : 'opacity-0'
 									}`}
-							>
+								>
 									{sortIcon(column)}
 								</span>
-						</button>
-					</th>
-				{/each}
-			</tr>
+							</button>
+						</th>
+					{/each}
+				</tr>
 			</thead>
 
 			<tbody class="divide-y divide-border">
-			{#if sortedRows.length}
-				{#each sortedRows as row, displayIndex (row.key)}
-					<tr class="transition hover:bg-surface-soft">
-						{#each visibleColumns as column (column.value)}
-							{#if column.value === 'title'}
-								<td class="max-w-96 px-3 py-2">
-									<div class="group flex min-w-0 items-center gap-3 text-text">
-										{#if row.url}
-											<a href={row.url} target="_blank" rel="noreferrer" class="shrink-0">
-												{#if row.imageUrl}
-													<img
-														src={row.imageUrl}
-														alt={row.title}
-														class="size-9 rounded-md object-cover"
-													/>
-												{:else}
-													<div class="size-9 rounded-md bg-surface-soft"></div>
-												{/if}
-											</a>
-										{:else}
-											{#if row.imageUrl}
+				{#if sortedRows.length}
+					{#each sortedRows as row, displayIndex (row.key)}
+						<tr class="transition hover:bg-surface-soft">
+							{#each visibleColumns as column (column.value)}
+								{#if column.value === 'title'}
+									<td class="max-w-96 px-3 py-2">
+										<div class="group flex min-w-0 items-center gap-3 text-text">
+											{#if row.url}
+												<a href={row.url} target="_blank" rel="noreferrer" class="shrink-0">
+													{#if row.imageUrl}
+														<img
+															src={row.imageUrl}
+															alt={row.title}
+															class="size-9 rounded-md object-cover"
+														/>
+													{:else}
+														<div class="size-9 rounded-md bg-surface-soft"></div>
+													{/if}
+												</a>
+											{:else if row.imageUrl}
 												<img
 													src={row.imageUrl}
 													alt={row.title}
@@ -730,97 +740,96 @@
 											{:else}
 												<div class="size-9 shrink-0 rounded-md bg-surface-soft"></div>
 											{/if}
-										{/if}
 
-										<div class="min-w-0 flex-1">
-											{#if row.url}
-												<a
-													href={row.url}
-													target="_blank"
-													rel="noreferrer"
-													class="block truncate font-medium transition hover:text-primary"
-												>
-													{row.title}
-												</a>
-											{:else}
-												<span class="block truncate font-medium">{row.title}</span>
-											{/if}
+											<div class="min-w-0 flex-1">
+												{#if row.url}
+													<a
+														href={row.url}
+														target="_blank"
+														rel="noreferrer"
+														class="block truncate font-medium transition hover:text-primary"
+													>
+														{row.title}
+													</a>
+												{:else}
+													<span class="block truncate font-medium">{row.title}</span>
+												{/if}
 
-											{#if row.subtitle || row.userStatus || row.franchiseUrl}
-												<div class="flex min-w-0 items-center gap-2 text-xs text-text-muted">
-						<span class="flex min-w-0 items-center gap-1">
-							{#if row.userStatus}
-								<StatusBadge class="mt-0.5" status={row.userStatus} />
-							{/if}
+												{#if row.subtitle || row.userStatus || row.franchiseUrl}
+													<div class="flex min-w-0 items-center gap-2 text-xs text-text-muted">
+														<span class="flex min-w-0 items-center gap-1">
+															{#if row.userStatus}
+																<StatusBadge class="mt-0.5" status={row.userStatus} />
+															{/if}
 
-							{#if row.subtitle}
-								<span class="truncate">{row.subtitle}</span>
-							{/if}
-						</span>
+															{#if row.subtitle}
+																<span class="truncate">{row.subtitle}</span>
+															{/if}
+														</span>
 
-													{#if row.franchiseUrl}
-							<span
-								class="
+														{#if row.franchiseUrl}
+															<span
+																class="
 									pointer-events-none hidden shrink-0 items-center gap-1 opacity-0 transition
-									group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100
 									group-focus-within:pointer-events-auto group-focus-within:flex group-focus-within:opacity-100
+									group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100
 								"
-							>
-								<a
-									href={row.franchiseUrl}
-									target="_blank"
-									rel="noreferrer"
-									class="
+															>
+																<a
+																	href={row.franchiseUrl}
+																	target="_blank"
+																	rel="noreferrer"
+																	class="
 										rounded border border-border px-1 py-0.5 text-[10px] leading-none text-text-muted
 										transition hover:border-primary hover:text-primary
 										focus:opacity-100
 									"
-									title={`Open franchise for ${row.title}`}
-									aria-label={`Open franchise for ${row.title}`}
-								>
-									Franchise
-								</a>
-							</span>
-													{/if}
-												</div>
-											{/if}
+																	title={`Open franchise for ${row.title}`}
+																	aria-label={`Open franchise for ${row.title}`}
+																>
+																	Franchise
+																</a>
+															</span>
+														{/if}
+													</div>
+												{/if}
 
-											{#if row.subtitleExtra}
-					<span class="block truncate text-[10px] text-text-muted">
-						{row.subtitleExtra}
-					</span>
+												{#if row.subtitleExtra}
+													<span class="block truncate text-[10px] text-text-muted">
+														{row.subtitleExtra}
+													</span>
+												{/if}
+											</div>
+										</div>
+									</td>
+								{:else if column.value === 'relation'}
+									<td class="px-3 py-2 text-text-soft">
+										<div class="max-w-44">
+											<p class="truncate">{cell(row, column.value, displayIndex) ?? '-'}</p>
+
+											{#if row.relationSource}
+												<p class="truncate text-xs text-text-muted">{row.relationSource}</p>
 											{/if}
 										</div>
-									</div>
-								</td>
-							{:else if column.value === 'relation'}
-								<td class="px-3 py-2 text-text-soft">
-									<div class="max-w-44">
-										<p class="truncate">{cell(row, column.value, displayIndex) ?? '-'}</p>
-
-										{#if row.relationSource}
-											<p class="truncate text-xs text-text-muted">{row.relationSource}</p>
-										{/if}
-									</div>
-								</td>
-							{:else}
-								<td class={cellClass(column)}>
-									{cell(row, column.value, displayIndex) ?? '-'}
-								</td>
-							{/if}
-						{/each}
+									</td>
+								{:else}
+									<td class={cellClass(column)}>
+										{cell(row, column.value, displayIndex) ?? '-'}
+									</td>
+								{/if}
+							{/each}
+						</tr>
+					{/each}
+				{:else}
+					<tr>
+						<td
+							colspan={Math.max(visibleColumns.length, 1)}
+							class="px-3 py-8 text-center text-text-muted"
+						>
+							No results.
+						</td>
 					</tr>
-				{/each}
-			{:else}
-				<tr>
-					<td
-						colspan={Math.max(visibleColumns.length, 1)}
-						class="px-3 py-8 text-center text-text-muted"
-					>
-						No results.
-					</td>
-				</tr>
-			{/if}
+				{/if}
 			</tbody>
 		</table>
 	</div>

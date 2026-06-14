@@ -38,7 +38,7 @@
 			lg:grid-cols-[auto_1fr_auto] lg:px-4
 		"
 	>
-		<a href="/list" class="shrink-0 text-sm font-semibold leading-none text-text">
+		<a href="/list" class="shrink-0 text-sm leading-none font-semibold text-text">
 			YourAnimeList
 		</a>
 

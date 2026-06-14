@@ -123,7 +123,7 @@
 		aria-expanded={open}
 		class={`
 			flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border
-			border-border bg-surface px-2 py-1.5 text-left text-sm text-text outline-none transition
+			border-border bg-surface px-2 py-1.5 text-left text-sm text-text transition outline-none
 			hover:border-primary/70 hover:bg-surface-soft
 			focus:border-primary
 			disabled:cursor-not-allowed disabled:opacity-60
@@ -191,11 +191,7 @@
 			"
 		>
 			<div class="flex min-w-0 items-center gap-2">
-				<Input
-					bind:value={query}
-					placeholder={searchPlaceholder}
-					class="h-8 min-w-0 flex-1"
-				/>
+				<Input bind:value={query} placeholder={searchPlaceholder} class="h-8 min-w-0 flex-1" />
 
 				{#if selectedOptions.length > 0}
 					<button
@@ -245,11 +241,7 @@
 							<span
 								class={`
 									flex size-4 shrink-0 items-center justify-center rounded border text-[10px]
-									${
-										isSelected(option)
-											? 'border-primary text-primary'
-											: 'border-border text-transparent'
-									}
+									${isSelected(option) ? 'border-primary text-primary' : 'border-border text-transparent'}
 								`}
 							>
 								✓
