@@ -13,6 +13,7 @@ import type {
 	UserAnimeListEdge,
 	UserAnimeListResponse
 } from '$lib/types/anime';
+import type { AnimeDbEntry } from '$lib/types/anime-db';
 import {
 	compareAnimeRelease,
 	EXCLUDED_FRANCHISE_RELATIONS,
@@ -42,6 +43,43 @@ type AnimeDbFranchiseResponse = {
 		limited: boolean;
 		count: number;
 		nodes: AnimeDbFranchiseNode[];
+	};
+};
+
+type RecommendationSource = {
+	animeId: number;
+	title: string;
+	count: number;
+};
+
+type RecommendationBranch = {
+	anime: AnimeDbEntry;
+	count: number;
+	sourceAnimeId: number;
+};
+
+type RecommendationRoot = {
+	anime: AnimeDbEntry;
+	count: number;
+	recommendations: RecommendationBranch[];
+};
+
+type RecommendationResult = {
+	anime: AnimeDbEntry;
+	score: number;
+	sourceCount: number;
+	totalCount: number;
+	sources: RecommendationSource[];
+};
+
+type AnimeRecommendationsResponse = {
+	data: {
+		seed: AnimeDbEntry;
+		rootLimit: number;
+		branchLimit: number;
+		minSources: number;
+		roots: RecommendationRoot[];
+		recommendations: RecommendationResult[];
 	};
 };
 
@@ -84,10 +122,24 @@ class AnimeDataStore {
 	franchiseCrawling = $state(false);
 	franchiseError = $state<string | null>(null);
 
+	recommendationQuery = $state('');
+	recommendationSearchResults = $state<AnimeSearchEdge[]>([]);
+	recommendationSearchLoading = $state(false);
+	recommendationSearchError = $state<string | null>(null);
+
+	recommendationSeedId = $state<number | null>(null);
+	recommendationSeed = $state<AnimeDbEntry | null>(null);
+	recommendationRoots = $state<RecommendationRoot[]>([]);
+	recommendationResults = $state<RecommendationResult[]>([]);
+	recommendationLoading = $state(false);
+	recommendationError = $state<string | null>(null);
+
 	private rankingRequestId = 0;
 	private franchiseSearchRequestId = 0;
 	private franchiseRunId = 0;
 	private franchiseStopRequested = false;
+	private recommendationSearchRequestId = 0;
+	private recommendationRequestId = 0;
 
 	constructor() {
 		void this.restore();
@@ -130,6 +182,14 @@ class AnimeDataStore {
 
 	get franchiseVisitedCount() {
 		return this.franchiseVisitedIds.length;
+	}
+
+	get recommendationAnimeList() {
+		return this.recommendationResults.map((item) => item.anime);
+	}
+
+	get hasRecommendations() {
+		return this.recommendationResults.length > 0;
 	}
 
 	async loadUserList(username = this.username) {
@@ -295,6 +355,94 @@ class AnimeDataStore {
 		}
 	}
 
+	async searchRecommendationAnime(query = this.recommendationQuery) {
+		const cleanQuery = query.trim();
+
+		if (!cleanQuery) {
+			this.recommendationSearchError = 'Search is required';
+			return;
+		}
+
+		const currentRequestId = ++this.recommendationSearchRequestId;
+
+		this.recommendationQuery = cleanQuery;
+		this.recommendationSearchLoading = true;
+		this.recommendationSearchError = null;
+
+		try {
+			const params = new URLSearchParams({
+				q: cleanQuery,
+				limit: '20'
+			});
+
+			const response = await fetch(`/api/mal/anime/search?${params.toString()}`);
+
+			if (!response.ok) {
+				const message = await response.text();
+				throw new Error(message || 'Failed to search anime');
+			}
+
+			const result = (await response.json()) as AnimeSearchResponse;
+
+			if (currentRequestId !== this.recommendationSearchRequestId) return;
+
+			this.recommendationSearchResults = result.data;
+		} catch (error) {
+			if (currentRequestId !== this.recommendationSearchRequestId) return;
+
+			this.recommendationSearchResults = [];
+			this.recommendationSearchError =
+				error instanceof Error ? error.message : 'Failed to search anime';
+		} finally {
+			if (currentRequestId === this.recommendationSearchRequestId) {
+				this.recommendationSearchLoading = false;
+			}
+		}
+	}
+
+	async loadRecommendations(seedId: number, roots = 5, branch = 3, minSources = 2) {
+		const currentRequestId = ++this.recommendationRequestId;
+
+		this.recommendationSeedId = seedId;
+		this.recommendationLoading = true;
+		this.recommendationError = null;
+
+		try {
+			const params = new URLSearchParams({
+				roots: String(roots),
+				branch: String(branch),
+				minSources: String(minSources)
+			});
+
+			const response = await fetch(`/api/mal/anime/recommendations/${seedId}?${params.toString()}`);
+
+			if (!response.ok) {
+				const message = await response.text();
+				throw new Error(message || 'Failed to load recommendations');
+			}
+
+			const result = (await response.json()) as AnimeRecommendationsResponse;
+
+			if (currentRequestId !== this.recommendationRequestId) return;
+
+			this.recommendationSeed = result.data.seed;
+			this.recommendationRoots = result.data.roots;
+			this.recommendationResults = result.data.recommendations;
+		} catch (error) {
+			if (currentRequestId !== this.recommendationRequestId) return;
+
+			this.recommendationSeed = null;
+			this.recommendationRoots = [];
+			this.recommendationResults = [];
+			this.recommendationError =
+				error instanceof Error ? error.message : 'Failed to load recommendations';
+		} finally {
+			if (currentRequestId === this.recommendationRequestId) {
+				this.recommendationLoading = false;
+			}
+		}
+	}
+
 	async startFranchise(seedId: number) {
 		this.clearFranchise();
 
@@ -413,6 +561,24 @@ class AnimeDataStore {
 		this.franchisePendingCandidates = [];
 		this.franchiseCrawling = false;
 		this.franchiseError = null;
+	}
+
+	clearRecommendations() {
+		this.recommendationRequestId += 1;
+		this.recommendationSeedId = null;
+		this.recommendationSeed = null;
+		this.recommendationRoots = [];
+		this.recommendationResults = [];
+		this.recommendationLoading = false;
+		this.recommendationError = null;
+	}
+
+	clearRecommendationSearch() {
+		this.recommendationSearchRequestId += 1;
+		this.recommendationQuery = '';
+		this.recommendationSearchResults = [];
+		this.recommendationSearchLoading = false;
+		this.recommendationSearchError = null;
 	}
 
 	private forceMalFranchiseFetch(animeId: number) {

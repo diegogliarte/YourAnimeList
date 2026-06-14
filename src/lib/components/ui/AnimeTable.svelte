@@ -9,6 +9,15 @@
 
 	export type AnimeTableAnime = UserAnimeListEdge | AnimeRankingEdge | AnimeDetails | AnimeDbEntry;
 
+	export type AnimeTableExtraColumn = {
+		label: string;
+		value: string;
+		align?: 'left' | 'right' | 'center';
+		width?: string;
+		getCell: (item: AnimeTableAnime) => string | number | null;
+		getSort?: (item: AnimeTableAnime) => string | number | null;
+	};
+
 	type SortDirection = 'asc' | 'desc';
 
 	type ColumnValue =
@@ -49,6 +58,7 @@
 		title: string;
 		url: string | null;
 		franchiseUrl: string | null;
+		recommendationsUrl: string | null;
 		imageUrl: string | null;
 		subtitle: string;
 		subtitleExtra: string | null;
@@ -87,6 +97,10 @@
 		showFilter?: boolean;
 		showColumnControls?: boolean;
 		showFranchiseLink?: boolean;
+		showRecommendationsLink?: boolean;
+		defaultSort?: string | null;
+		defaultDirection?: SortDirection | null;
+		extraColumns?: AnimeTableExtraColumn[];
 		getSubtitleExtra?: (item: AnimeTableAnime) => string | null | undefined;
 		class?: string;
 	};
@@ -95,12 +109,12 @@
 
 	const columns: Column[] = [
 		{ label: '#', value: 'rank', width: '1rem' },
-		{ label: 'Anime', value: 'title', width: '24rem', hideable: false },
+		{ label: 'Anime', value: 'title', width: '20rem', hideable: false },
 		{ label: 'Relation', value: 'relation', width: '10rem' },
 		{ label: 'Score', value: 'score', align: 'center', width: '4.5rem' },
 		{ label: 'MAL', value: 'mal_score', align: 'center', width: '4.5rem' },
-		{ label: 'Progress', value: 'progress', align: 'center', width: '5.5rem' },
-		{ label: 'Episodes', value: 'episodes', align: 'center', width: '5.5rem' },
+		{ label: 'Progress', value: 'progress', align: 'center', width: '4rem' },
+		{ label: 'Episodes', value: 'episodes', align: 'center', width: '4rem' },
 		{ label: 'Season', value: 'season', align: 'center', width: '6rem' },
 		{ label: 'Popularity', value: 'popularity', align: 'center', width: '6rem' },
 		{ label: 'Type', value: 'media_type', align: 'center', width: '5.5rem' },
@@ -109,7 +123,7 @@
 		{ label: 'Rating', value: 'rating', align: 'center', width: '6rem' },
 		{ label: 'NSFW', value: 'nsfw', align: 'center', width: '5rem' },
 		{ label: 'Avg Ep', value: 'average_duration', align: 'center', width: '6rem' },
-		{ label: 'Total Time', value: 'total_duration', align: 'center', width: '7rem' },
+		{ label: 'Total Time', value: 'total_duration', align: 'center', width: '4rem' },
 		{ label: 'Start Date', value: 'start_date', align: 'center', width: '7rem' },
 		{ label: 'End Date', value: 'end_date', align: 'center', width: '7rem' }
 	];
@@ -130,13 +144,17 @@
 		showFilter = true,
 		showColumnControls = true,
 		showFranchiseLink = true,
+		showRecommendationsLink = true,
+		defaultSort = null,
+		defaultDirection = null,
+		extraColumns = [],
 		getSubtitleExtra,
 		class: className = ''
 	}: Props = $props();
 
 	let query = $state('');
-	let selectedSort = $state<ColumnValue | null>(null);
-	let direction = $state<SortDirection | null>(null);
+	let selectedSort = $state<string | null>(defaultSort);
+	let direction = $state<SortDirection | null>(defaultDirection);
 	let hiddenColumns = $state<ColumnValue[]>(getDefaultHiddenColumns());
 
 	const userEntryByAnimeId = $derived.by(() => {
@@ -161,6 +179,8 @@
 		});
 	});
 
+	const visibleExtraColumns = $derived(extraColumns);
+
 	const filteredRows = $derived.by(() => {
 		if (!showFilter || !query.trim()) return rows;
 
@@ -173,21 +193,21 @@
 		const sort = selectedSort;
 		const sortDirection = direction;
 
-		if (!sort || !sortDirection || !isVisible(sort)) return filteredRows;
+		if (!sort || !sortDirection || !isSortable(sort)) return filteredRows;
 
 		return [...filteredRows].sort((a, b) => {
-			const result = compareValues(a.sorts[sort], b.sorts[sort]);
+			const result = compareValues(getSortValue(a, sort), getSortValue(b, sort));
 
 			return sortDirection === 'desc' ? -result : result;
 		});
 	});
 
 	const tableWidth = $derived.by(() => {
-		const widths = visibleColumns
+		const widths = [...visibleColumns, ...visibleExtraColumns]
 			.map((column) => column.width)
 			.filter((width): width is string => Boolean(width));
 
-		return widths.length === visibleColumns.length
+		return widths.length === visibleColumns.length + visibleExtraColumns.length
 			? `max(100%, calc(${widths.join(' + ')}))`
 			: '100%';
 	});
@@ -197,7 +217,7 @@
 	});
 
 	$effect(() => {
-		if (selectedSort && !isVisible(selectedSort)) {
+		if (selectedSort && !isSortable(selectedSort)) {
 			selectedSort = null;
 			direction = null;
 		}
@@ -222,6 +242,9 @@
 
 		const subtitle = [
 			label(getMediaType(item)),
+			isDbEntry(item) ? label(item.source) : null,
+			isDbEntry(item) ? label(item.rating) : null,
+			!isDbEntry(item) ? seasonText : null,
 			episodes ? `${formatNumber(episodes)} eps` : null,
 			averageDuration ? `${formatDuration(averageDuration)}/ep` : null,
 			totalDuration ? formatDuration(totalDuration) : null
@@ -281,6 +304,7 @@
 			title,
 			url: getUrl(item, id),
 			franchiseUrl: getFranchiseUrl(id),
+			recommendationsUrl: getRecommendationsUrl(id),
 			imageUrl: getImageUrl(item),
 			subtitle,
 			subtitleExtra,
@@ -293,9 +317,9 @@
 		};
 	}
 
-	function toggleSort(column: Column) {
-		if (selectedSort !== column.value) {
-			selectedSort = column.value;
+	function toggleSort(value: string) {
+		if (selectedSort !== value) {
+			selectedSort = value;
 			direction = 'asc';
 			return;
 		}
@@ -325,6 +349,24 @@
 		return row.cells[value] ?? null;
 	}
 
+	function extraCell(row: AnimeRow, column: AnimeTableExtraColumn) {
+		return column.getCell(row.item) ?? null;
+	}
+
+	function getSortValue(row: AnimeRow, value: string) {
+		const normalColumn = columns.find((column) => column.value === value);
+
+		if (normalColumn) {
+			return row.sorts[normalColumn.value];
+		}
+
+		const extraColumn = visibleExtraColumns.find((column) => column.value === value);
+
+		if (!extraColumn) return null;
+
+		return extraColumn.getSort?.(row.item) ?? extraColumn.getCell(row.item);
+	}
+
 	function isRelevant(row: AnimeRow, value: ColumnValue) {
 		if (value === 'relation') {
 			return hasValue(row.cells.relation) || hasValue(row.relationSource);
@@ -341,17 +383,28 @@
 		return visibleColumns.some((column) => column.value === value);
 	}
 
+	function isSortable(value: string) {
+		if (columns.some((column) => column.value === value)) {
+			return isVisible(value as ColumnValue);
+		}
+
+		return visibleExtraColumns.some((column) => column.value === value);
+	}
+
 	function isColumnDisabled(column: Column) {
 		return column.hideable === false || (isVisible(column.value) && visibleColumns.length <= 1);
 	}
 
 	function getFilterText(row: AnimeRow) {
+		const extraValues = visibleExtraColumns.map((column) => extraCell(row, column));
+
 		return [
 			row.title,
 			row.subtitle,
 			row.subtitleExtra,
 			row.relationSource,
-			...Object.values(row.cells)
+			...Object.values(row.cells),
+			...extraValues
 		]
 			.filter(Boolean)
 			.join(' ');
@@ -429,6 +482,10 @@
 
 	function getFranchiseUrl(id: number | null) {
 		return showFranchiseLink && id ? `/franchises/${id}` : null;
+	}
+
+	function getRecommendationsUrl(id: number | null) {
+		return showRecommendationsLink && id ? `/recommendations/${id}` : null;
 	}
 
 	function getImageUrl(item: AnimeTableAnime) {
@@ -625,8 +682,8 @@
 		return value.charAt(0).toUpperCase() + value.slice(1);
 	}
 
-	function sortIcon(column: Column) {
-		if (selectedSort !== column.value) return '△';
+	function sortIcon(value: string) {
+		if (selectedSort !== value) return '△';
 
 		return direction === 'desc' ? '▽' : '△';
 	}
@@ -638,7 +695,7 @@
 		return 'text-left';
 	}
 
-	function cellClass(column: Column) {
+	function cellClass(column: Pick<Column, 'align' | 'value'>) {
 		return [
 			'px-3 py-2 whitespace-nowrap text-text-soft',
 			alignClass(column.align),
@@ -688,6 +745,10 @@
 				{#each visibleColumns as column (column.value)}
 					<col style:width={column.width} />
 				{/each}
+
+				{#each visibleExtraColumns as column (column.value)}
+					<col style:width={column.width} />
+				{/each}
 			</colgroup>
 
 			<thead class="bg-surface-soft text-xs text-text-muted">
@@ -697,7 +758,7 @@
 							<button
 								type="button"
 								class="inline-flex cursor-pointer items-center gap-1 text-inherit transition hover:text-text"
-								onclick={() => toggleSort(column)}
+								onclick={() => toggleSort(column.value)}
 							>
 								<span>{column.label}</span>
 
@@ -706,7 +767,27 @@
 										selectedSort === column.value ? 'opacity-100' : 'opacity-0'
 									}`}
 								>
-									{sortIcon(column)}
+									{sortIcon(column.value)}
+								</span>
+							</button>
+						</th>
+					{/each}
+
+					{#each visibleExtraColumns as column (column.value)}
+						<th class={`px-3 py-2 font-medium whitespace-nowrap ${alignClass(column.align)}`}>
+							<button
+								type="button"
+								class="inline-flex cursor-pointer items-center gap-1 text-inherit transition hover:text-text"
+								onclick={() => toggleSort(column.value)}
+							>
+								<span>{column.label}</span>
+
+								<span
+									class={`inline-block w-3 text-right text-primary ${
+										selectedSort === column.value ? 'opacity-100' : 'opacity-0'
+									}`}
+								>
+									{sortIcon(column.value)}
 								</span>
 							</button>
 						</th>
@@ -717,7 +798,7 @@
 			<tbody class="divide-y divide-border">
 				{#if sortedRows.length}
 					{#each sortedRows as row, displayIndex (row.key)}
-						<tr class="transition hover:bg-surface-soft">
+						<tr class="group transition hover:bg-surface-soft">
 							{#each visibleColumns as column (column.value)}
 								{#if column.value === 'title'}
 									<td class="max-w-96 px-3 py-2">
@@ -758,7 +839,7 @@
 													<span class="block truncate font-medium">{row.title}</span>
 												{/if}
 
-												{#if row.subtitle || row.userStatus || row.franchiseUrl}
+												{#if row.subtitle || row.userStatus || row.franchiseUrl || row.recommendationsUrl}
 													<div class="flex min-w-0 items-center gap-2 text-xs text-text-muted">
 														<span class="flex min-w-0 items-center gap-1">
 															{#if row.userStatus}
@@ -770,28 +851,47 @@
 															{/if}
 														</span>
 
-														{#if row.franchiseUrl}
+														{#if row.franchiseUrl || row.recommendationsUrl}
 															<span
 																class="
-									pointer-events-none hidden shrink-0 items-center gap-1 opacity-0 transition
-									group-focus-within:pointer-events-auto group-focus-within:flex group-focus-within:opacity-100
-									group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100
-								"
+			pointer-events-none hidden shrink-0 items-center gap-1 opacity-0 transition
+			group-focus-within:pointer-events-auto group-focus-within:flex group-focus-within:opacity-100
+			group-hover:pointer-events-auto group-hover:flex group-hover:opacity-100
+		"
 															>
-																<a
-																	href={row.franchiseUrl}
-																	target="_blank"
-																	rel="noreferrer"
-																	class="
-										rounded border border-border px-1 py-0.5 text-[10px] leading-none text-text-muted
-										transition hover:border-primary hover:text-primary
-										focus:opacity-100
-									"
-																	title={`Open franchise for ${row.title}`}
-																	aria-label={`Open franchise for ${row.title}`}
-																>
-																	Franchise
-																</a>
+																{#if row.franchiseUrl}
+																	<a
+																		href={row.franchiseUrl}
+																		target="_blank"
+																		rel="noreferrer"
+																		class="
+					rounded border border-border px-1 py-0.5 text-[10px] leading-none text-text-muted
+					transition hover:border-primary hover:text-primary
+					focus:border-primary focus:text-primary
+				"
+																		title={`Open franchise for ${row.title}`}
+																		aria-label={`Open franchise for ${row.title}`}
+																	>
+																		Franchise
+																	</a>
+																{/if}
+
+																{#if row.recommendationsUrl}
+																	<a
+																		href={row.recommendationsUrl}
+																		target="_blank"
+																		rel="noreferrer"
+																		class="
+					rounded border border-border px-1 py-0.5 text-[10px] leading-none text-text-muted
+					transition hover:border-primary hover:text-primary
+					focus:border-primary focus:text-primary
+				"
+																		title={`Open recommendations for ${row.title}`}
+																		aria-label={`Open recommendations for ${row.title}`}
+																	>
+																		Recommendations
+																	</a>
+																{/if}
 															</span>
 														{/if}
 													</div>
@@ -821,12 +921,22 @@
 									</td>
 								{/if}
 							{/each}
+
+							{#each visibleExtraColumns as column (column.value)}
+								<td
+									class={['px-3 py-2 whitespace-nowrap text-text-soft', alignClass(column.align)]
+										.filter(Boolean)
+										.join(' ')}
+								>
+									{extraCell(row, column) ?? '-'}
+								</td>
+							{/each}
 						</tr>
 					{/each}
 				{:else}
 					<tr>
 						<td
-							colspan={Math.max(visibleColumns.length, 1)}
+							colspan={Math.max(visibleColumns.length + visibleExtraColumns.length, 1)}
 							class="px-3 py-8 text-center text-text-muted"
 						>
 							No results.

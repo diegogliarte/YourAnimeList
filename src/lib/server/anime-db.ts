@@ -30,6 +30,45 @@ export type AnimeDbFranchiseResponse = {
 	data: AnimeDbFranchiseGraph;
 };
 
+export type AnimeDbRecommendationSource = {
+	animeId: number;
+	title: string;
+	count: number;
+};
+
+export type AnimeDbRecommendationBranch = {
+	anime: unknown;
+	count: number;
+	sourceAnimeId: number;
+};
+
+export type AnimeDbRecommendationRoot = {
+	anime: unknown;
+	count: number;
+	recommendations: AnimeDbRecommendationBranch[];
+};
+
+export type AnimeDbRecommendationResult = {
+	anime: unknown;
+	score: number;
+	sourceCount: number;
+	totalCount: number;
+	sources: AnimeDbRecommendationSource[];
+};
+
+export type AnimeDbRecommendationsGraph = {
+	seed: unknown;
+	rootLimit: number;
+	branchLimit: number;
+	minSources: number;
+	roots: AnimeDbRecommendationRoot[];
+	recommendations: AnimeDbRecommendationResult[];
+};
+
+export type AnimeDbRecommendationsResponse = {
+	data: AnimeDbRecommendationsGraph;
+};
+
 const ANIME_DB_API_URL = process.env.PUBLIC_ANIME_DB_API_URL || 'http://localhost:3001';
 const ANIME_DB_TIMEOUT_MS = 1500;
 const ANIME_DB_FRANCHISE_MAX_NODES = 1000;
@@ -59,6 +98,42 @@ export async function tryFetchAnimeDbFranchise(
 		const result = (await response.json()) as AnimeDbFranchiseResponse;
 
 		if (!result.data?.nodes?.length) return null;
+
+		return result;
+	} catch {
+		return null;
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+export async function tryFetchAnimeDbRecommendations(
+	fetcher: Fetch,
+	animeId: number,
+	params = new URLSearchParams()
+): Promise<AnimeDbRecommendationsResponse | null> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), ANIME_DB_TIMEOUT_MS);
+
+	try {
+		const url = new URL(`${ANIME_DB_API_URL}/recommendations/${animeId}`);
+
+		for (const [key, value] of params) {
+			url.searchParams.append(key, value);
+		}
+
+		const response = await fetcher(url.toString(), {
+			headers: {
+				accept: 'application/json'
+			},
+			signal: controller.signal
+		});
+
+		if (!response.ok) return null;
+
+		const result = (await response.json()) as AnimeDbRecommendationsResponse;
+
+		if (!result.data?.seed) return null;
 
 		return result;
 	} catch {

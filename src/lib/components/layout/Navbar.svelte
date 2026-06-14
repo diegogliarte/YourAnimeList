@@ -9,6 +9,7 @@
 		{ label: 'Stats', href: '/stats' },
 		{ label: 'Top Anime', href: '/top-anime' },
 		{ label: 'Franchises', href: '/franchises' },
+		{ label: 'Recommendations', href: '/recommendations' },
 		{ label: 'Search DB', href: '/search-db' }
 	];
 
