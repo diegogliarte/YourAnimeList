@@ -327,6 +327,8 @@
 		if (value === 'most_listed') return 'Most listed';
 		if (value === 'most_episodes') return 'Most episodes';
 		if (value === 'fewest_episodes') return 'Fewest episodes';
+		if (value === 'longest_average_episode') return 'Longest average episode';
+		if (value === 'shortest_average_episode') return 'Shortest average episode';
 		if (value === 'longest_runtime') return 'Longest runtime';
 		if (value === 'shortest_runtime') return 'Shortest runtime';
 		if (value === 'title_asc') return 'Title';
