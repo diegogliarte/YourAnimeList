@@ -155,32 +155,49 @@
 					{#if expanded}
 						<div class="grid gap-2 border-t border-border bg-background/40 p-2 sm:grid-cols-2 lg:grid-cols-3">
 							{#each group.entries as entry (entry.anime.id)}
-								<a
-									href={getAnimeUrl(entry.anime.id)}
-									target="_blank"
-									rel="noreferrer"
+								<div
 									class="group flex min-w-0 gap-2 rounded-md border border-border bg-surface p-2 transition hover:border-primary/70 hover:bg-surface-soft"
 								>
 									{#if getMissingImageUrl(entry)}
-										<img
-											src={getMissingImageUrl(entry)}
-											alt={entry.anime.title}
-											class="h-18 w-12 shrink-0 rounded object-cover"
-										/>
+										<a
+											href={getAnimeUrl(entry.anime.id)}
+											target="_blank"
+											rel="noreferrer"
+											class="h-18 w-12 shrink-0"
+										>
+											<img
+												src={getMissingImageUrl(entry)}
+												alt={entry.anime.title}
+												class="h-full w-full rounded object-cover"
+											/>
+										</a>
 									{:else}
 										<span class="h-18 w-12 shrink-0 rounded bg-surface-soft"></span>
 									{/if}
 
 									<span class="min-w-0 flex-1">
-										<span class="line-clamp-2 text-sm font-medium text-text group-hover:text-primary">
+										<a
+											href={getAnimeUrl(entry.anime.id)}
+											target="_blank"
+											rel="noreferrer"
+											class="line-clamp-2 text-sm font-medium text-text group-hover:text-primary"
+										>
 											{entry.anime.title}
-										</span>
+										</a>
 										<span class="mt-1 block text-xs text-text-muted">{getMissingMeta(entry)}</span>
-										<span class="mt-2 block text-xs text-primary">
+										<span class="mt-1 block text-xs text-primary">
 											{getRelationLabels(entry, group.animeId)}
 										</span>
+										<a
+											href={`/franchises/${entry.anime.id}`}
+											target="_blank"
+											rel="noreferrer"
+											class="mt-2 inline-flex rounded border border-border px-1.5 py-1 text-[10px] leading-none text-text-muted transition hover:border-primary hover:text-primary"
+										>
+											Franchise
+										</a>
 									</span>
-								</a>
+								</div>
 							{/each}
 						</div>
 					{/if}
