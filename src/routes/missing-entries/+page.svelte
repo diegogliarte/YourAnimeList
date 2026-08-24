@@ -123,34 +123,45 @@
 			{#each groups as group (group.animeId)}
 				{@const expanded = expandedSourceIds.includes(group.animeId)}
 				<section class="overflow-hidden rounded-md border border-border bg-surface">
-					<button
-						type="button"
-						class="flex w-full cursor-pointer items-center gap-3 p-2 text-left transition hover:bg-surface-soft"
-						onclick={() => toggleSource(group.animeId)}
-						aria-expanded={expanded}
-					>
-						{#if group.imageUrl}
-							<img
-								src={group.imageUrl}
-								alt={group.title}
-								class="h-20 w-14 shrink-0 rounded object-cover"
-							/>
-						{:else}
-							<span class="h-20 w-14 shrink-0 rounded bg-surface-soft"></span>
-						{/if}
+					<div class="flex items-center gap-2 p-2">
+						<button
+							type="button"
+							class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
+							onclick={() => toggleSource(group.animeId)}
+							aria-expanded={expanded}
+						>
+							{#if group.imageUrl}
+								<img
+									src={group.imageUrl}
+									alt={group.title}
+									class="h-20 w-14 shrink-0 rounded object-cover"
+								/>
+							{:else}
+								<span class="h-20 w-14 shrink-0 rounded bg-surface-soft"></span>
+							{/if}
 
-						<span class="min-w-0 flex-1">
-							<span class="block truncate text-sm font-semibold text-text">{group.title}</span>
-							<span class="mt-1 block text-xs text-text-muted">
-								{group.entries.length} missing direct
-								{group.entries.length === 1 ? 'entry' : 'entries'}
+							<span class="min-w-0 flex-1">
+								<span class="block truncate text-sm font-semibold text-text">{group.title}</span>
+								<span class="mt-1 block text-xs text-text-muted">
+									{group.entries.length} missing direct
+									{group.entries.length === 1 ? 'entry' : 'entries'}
+								</span>
 							</span>
-						</span>
 
-						<span class="shrink-0 text-xs font-medium text-primary">
-							{expanded ? 'Hide' : 'Show'}
-						</span>
-					</button>
+							<span class="shrink-0 text-xs font-medium text-primary">
+								{expanded ? 'Hide' : 'Show'}
+							</span>
+						</button>
+
+						<a
+							href={`/franchises/${group.animeId}`}
+							target="_blank"
+							rel="noreferrer"
+							class="shrink-0 rounded border border-border px-2 py-1.5 text-xs text-text-muted transition hover:border-primary hover:text-primary"
+						>
+							Franchise
+						</a>
+					</div>
 
 					{#if expanded}
 						<div class="grid gap-2 border-t border-border bg-background/40 p-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -188,14 +199,6 @@
 										<span class="mt-1 block text-xs text-primary">
 											{getRelationLabels(entry, group.animeId)}
 										</span>
-										<a
-											href={`/franchises/${entry.anime.id}`}
-											target="_blank"
-											rel="noreferrer"
-											class="mt-2 inline-flex rounded border border-border px-1.5 py-1 text-[10px] leading-none text-text-muted transition hover:border-primary hover:text-primary"
-										>
-											Franchise
-										</a>
 									</span>
 								</div>
 							{/each}
