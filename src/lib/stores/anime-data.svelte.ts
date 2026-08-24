@@ -250,6 +250,18 @@ class AnimeDataStore {
 
 		const requestId = ++this.missingEntriesRequestId;
 		const username = this.loadedUsername;
+		const completedAnimeIds = this.userList
+			.filter((entry) => entry.list_status.status === 'completed')
+			.map((entry) => entry.node.id);
+
+		if (completedAnimeIds.length === 0) {
+			this.missingEntries = [];
+			this.missingEntriesError = null;
+			this.missingEntriesUsername = username;
+			this.missingEntriesLoading = false;
+			return;
+		}
+
 		this.missingEntriesLoading = true;
 		this.missingEntriesError = null;
 
@@ -257,7 +269,7 @@ class AnimeDataStore {
 			const response = await fetch('/api/mal/users/missing-entries', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ animeIds: this.userList.map((entry) => entry.node.id) })
+				body: JSON.stringify({ animeIds: completedAnimeIds })
 			});
 
 			if (!response.ok) {
@@ -269,7 +281,9 @@ class AnimeDataStore {
 
 			if (requestId !== this.missingEntriesRequestId) return;
 
-			this.missingEntries = result.data;
+			const listedAnimeIds = new Set(this.userList.map((entry) => entry.node.id));
+
+			this.missingEntries = result.data.filter((entry) => !listedAnimeIds.has(entry.anime.id));
 			this.missingEntriesUsername = username;
 		} catch (error) {
 			if (requestId !== this.missingEntriesRequestId) return;

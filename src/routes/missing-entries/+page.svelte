@@ -8,26 +8,35 @@
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { MissingEntry } from '$lib/types/anime-db';
 
-	const entryByAnimeId = $derived(
-		new Map(animeData.missingEntries.map((entry) => [entry.anime.id, entry]))
-	);
-	const items = $derived(animeData.missingEntries.map((entry) => entry.anime));
+	type MissingEntriesGroup = {
+		animeId: number;
+		title: string;
+		entries: MissingEntry[];
+	};
 
-	const extraColumns: AnimeTableExtraColumn[] = [
-		{
-			label: 'Related from',
-			value: 'related_from',
-			width: '16rem',
-			getCell: (item) => getEntry(item)?.sources.map((source) => source.title).join(', ') ?? null
-		},
-		{
-			label: 'Relation',
-			value: 'direct_relation',
-			width: '10rem',
-			getCell: (item) => getRelationLabels(getEntry(item)),
-			getSort: (item) => getRelationLabels(getEntry(item))
+	let expandedSourceIds = $state<number[]>([]);
+
+	const groups = $derived.by(() => {
+		const groupsBySourceId = new Map<number, MissingEntriesGroup>();
+
+		for (const entry of animeData.missingEntries) {
+			for (const source of entry.sources) {
+				const group = groupsBySourceId.get(source.animeId) ?? {
+					animeId: source.animeId,
+					title: source.title,
+					entries: []
+				};
+
+				if (!group.entries.some((current) => current.anime.id === entry.anime.id)) {
+					group.entries.push(entry);
+				}
+
+				groupsBySourceId.set(source.animeId, group);
+			}
 		}
-	];
+
+		return [...groupsBySourceId.values()].sort((a, b) => a.title.localeCompare(b.title));
+	});
 
 	$effect(() => {
 		const loadedUsername = animeData.loadedUsername;
@@ -42,18 +51,42 @@
 		}
 	});
 
-	function getEntry(item: AnimeTableAnime) {
-		return entryByAnimeId.get(getAnimeId(item));
+	function toggleSource(animeId: number) {
+		expandedSourceIds = expandedSourceIds.includes(animeId)
+			? expandedSourceIds.filter((id) => id !== animeId)
+			: [...expandedSourceIds, animeId];
 	}
 
 	function getAnimeId(item: AnimeTableAnime) {
 		return 'node' in item ? item.node.id : item.id;
 	}
 
-	function getRelationLabels(entry?: MissingEntry) {
+	function getEntry(group: MissingEntriesGroup, item: AnimeTableAnime) {
+		return group.entries.find((entry) => entry.anime.id === getAnimeId(item));
+	}
+
+	function getRelationLabels(entry: MissingEntry | undefined, sourceAnimeId: number) {
 		if (!entry) return null;
 
-		return [...new Set(entry.sources.map((source) => source.relationLabel))].join(', ');
+		return [
+			...new Set(
+				entry.sources
+					.filter((source) => source.animeId === sourceAnimeId)
+					.map((source) => source.relationLabel)
+			)
+		].join(', ');
+	}
+
+	function getExtraColumns(group: MissingEntriesGroup): AnimeTableExtraColumn[] {
+		return [
+			{
+				label: 'Relation',
+				value: 'direct_relation',
+				width: '10rem',
+				getCell: (item) => getRelationLabels(getEntry(group, item), group.animeId),
+				getSort: (item) => getRelationLabels(getEntry(group, item), group.animeId)
+			}
+		];
 	}
 </script>
 
@@ -61,7 +94,7 @@
 	<Panel title="Missing entries">
 		<p class="text-sm text-text-muted">
 			Anime absent from {animeData.loadedUsername || 'the loaded user'}'s list that are directly
-			related to at least one entry on it.
+			related to a completed entry. Select a completed show to see or hide its missing entries.
 		</p>
 	</Panel>
 
@@ -78,17 +111,41 @@
 		<Panel>
 			<p class="text-sm text-text-muted">Load a MAL username from the navbar first.</p>
 		</Panel>
-	{:else if items.length === 0}
+	{:else if groups.length === 0}
 		<Panel>
 			<p class="text-sm text-text-muted">No directly related missing entries found.</p>
 		</Panel>
 	{:else}
-		<AnimeTable
-			{items}
-			{extraColumns}
-			filterPlaceholder="Filter missing entries..."
-			defaultSort="related_from"
-			defaultDirection="asc"
-		/>
+		<div class="grid gap-2">
+			{#each groups as group (group.animeId)}
+				{@const expanded = expandedSourceIds.includes(group.animeId)}
+				<section class="overflow-hidden rounded-md border border-border bg-surface">
+					<button
+						type="button"
+						class="flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left transition hover:bg-surface-soft"
+						onclick={() => toggleSource(group.animeId)}
+						aria-expanded={expanded}
+					>
+						<span class="min-w-0 truncate text-sm font-semibold text-text">{group.title}</span>
+						<span class="shrink-0 text-xs text-text-muted">
+							{group.entries.length} missing · {expanded ? 'Hide' : 'Show'}
+						</span>
+					</button>
+
+					{#if expanded}
+						<div class="border-t border-border">
+							<AnimeTable
+								items={group.entries.map((entry) => entry.anime)}
+								extraColumns={getExtraColumns(group)}
+								filterPlaceholder={`Filter entries related to ${group.title}...`}
+								defaultSort="direct_relation"
+								defaultDirection="asc"
+								class="rounded-none border-0"
+							/>
+						</div>
+					{/if}
+				</section>
+			{/each}
+		</div>
 	{/if}
 </div>
