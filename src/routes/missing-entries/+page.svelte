@@ -3,6 +3,7 @@
 		type AnimeTableAnime,
 		type AnimeTableExtraColumn
 	} from '$lib/components/ui/AnimeTable.svelte';
+	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { MissingEntry } from '$lib/types/anime-db';
@@ -68,7 +69,10 @@
 		<Panel>Loading missing entries...</Panel>
 	{:else if animeData.missingEntriesError}
 		<Panel>
-			<p class="text-sm text-primary">{animeData.missingEntriesError}</p>
+			<div class="flex flex-wrap items-center justify-between gap-3">
+				<p class="text-sm text-primary">{animeData.missingEntriesError}</p>
+				<Button onclick={() => animeData.loadMissingEntries()}>Retry</Button>
+			</div>
 		</Panel>
 	{:else if !animeData.hasUserList}
 		<Panel>

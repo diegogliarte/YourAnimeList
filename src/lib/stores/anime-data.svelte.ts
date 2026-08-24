@@ -275,7 +275,8 @@ class AnimeDataStore {
 			if (requestId !== this.missingEntriesRequestId) return;
 
 			this.missingEntries = [];
-			this.missingEntriesUsername = '';
+			// Record the attempt so the page effect does not retry a failed request forever.
+			this.missingEntriesUsername = username;
 			this.missingEntriesError =
 				error instanceof Error ? error.message : 'Failed to load missing entries';
 		} finally {
