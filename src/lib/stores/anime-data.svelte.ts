@@ -13,7 +13,7 @@ import type {
 	UserAnimeListEdge,
 	UserAnimeListResponse
 } from '$lib/types/anime';
-import type { AnimeDbEntry } from '$lib/types/anime-db';
+import type { AnimeDbEntry, MissingEntry, MissingEntriesResponse } from '$lib/types/anime-db';
 import {
 	compareAnimeRelease,
 	EXCLUDED_FRANCHISE_RELATIONS,
@@ -101,6 +101,11 @@ class AnimeDataStore {
 	userListLoading = $state(false);
 	userListError = $state<string | null>(null);
 
+	missingEntries = $state<MissingEntry[]>([]);
+	missingEntriesLoading = $state(false);
+	missingEntriesError = $state<string | null>(null);
+	missingEntriesUsername = $state('');
+
 	rankingType = $state<AnimeRankingType>('all');
 	rankingDataByType = $state<Partial<Record<AnimeRankingType, AnimeRankingEdge[]>>>({});
 	rankingNextOffsetByType = $state<Partial<Record<AnimeRankingType, number | null>>>({});
@@ -142,6 +147,7 @@ class AnimeDataStore {
 	private franchiseStopRequested = false;
 	private recommendationSearchRequestId = 0;
 	private recommendationRequestId = 0;
+	private missingEntriesRequestId = 0;
 
 	constructor() {
 		void this.restore();
@@ -221,6 +227,11 @@ class AnimeDataStore {
 
 			this.loadedUsername = result.username;
 			this.userList = result.data;
+			this.missingEntriesRequestId += 1;
+			this.missingEntries = [];
+			this.missingEntriesError = null;
+			this.missingEntriesUsername = '';
+			this.missingEntriesLoading = false;
 
 			void this.persist();
 		} catch (error) {
@@ -231,6 +242,46 @@ class AnimeDataStore {
 			void this.persist();
 		} finally {
 			this.userListLoading = false;
+		}
+	}
+
+	async loadMissingEntries() {
+		if (!this.hasUserList || !this.loadedUsername) return;
+
+		const requestId = ++this.missingEntriesRequestId;
+		const username = this.loadedUsername;
+		this.missingEntriesLoading = true;
+		this.missingEntriesError = null;
+
+		try {
+			const response = await fetch('/api/mal/users/missing-entries', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ animeIds: this.userList.map((entry) => entry.node.id) })
+			});
+
+			if (!response.ok) {
+				const message = await response.text();
+				throw new Error(message || 'Failed to load missing entries');
+			}
+
+			const result = (await response.json()) as MissingEntriesResponse;
+
+			if (requestId !== this.missingEntriesRequestId) return;
+
+			this.missingEntries = result.data;
+			this.missingEntriesUsername = username;
+		} catch (error) {
+			if (requestId !== this.missingEntriesRequestId) return;
+
+			this.missingEntries = [];
+			this.missingEntriesUsername = '';
+			this.missingEntriesError =
+				error instanceof Error ? error.message : 'Failed to load missing entries';
+		} finally {
+			if (requestId === this.missingEntriesRequestId) {
+				this.missingEntriesLoading = false;
+			}
 		}
 	}
 
@@ -531,11 +582,15 @@ class AnimeDataStore {
 	}
 
 	clearUserList() {
+		this.missingEntriesRequestId += 1;
 		this.username = '';
 		this.loadedUsername = '';
 		this.savedAt = null;
 		this.userList = [];
 		this.userListError = null;
+		this.missingEntries = [];
+		this.missingEntriesError = null;
+		this.missingEntriesUsername = '';
 
 		if (browser) {
 			void removeIndexedCache(STORAGE_KEY);

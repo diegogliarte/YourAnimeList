@@ -1,4 +1,5 @@
 import type { AnimeDetails } from '$lib/types/anime';
+import type { MissingEntriesResponse } from '$lib/types/anime-db';
 import { EXCLUDED_FRANCHISE_RELATIONS } from '$lib/utils/anime.utils';
 
 type Fetch = typeof fetch;
@@ -137,6 +138,34 @@ export async function tryFetchAnimeDbRecommendations(
 		if (!result.data?.seed) return null;
 
 		return result;
+	} catch {
+		return null;
+	} finally {
+		clearTimeout(timeout);
+	}
+}
+
+export async function tryFetchAnimeDbMissingEntries(
+	fetcher: Fetch,
+	animeIds: number[]
+): Promise<MissingEntriesResponse | null> {
+	const controller = new AbortController();
+	const timeout = setTimeout(() => controller.abort(), 10_000);
+
+	try {
+		const response = await fetcher(`${ANIME_DB_API_URL}/missing-entries`, {
+			method: 'POST',
+			headers: {
+				accept: 'application/json',
+				'content-type': 'application/json'
+			},
+			body: JSON.stringify({ animeIds }),
+			signal: controller.signal
+		});
+
+		if (!response.ok) return null;
+
+		return (await response.json()) as MissingEntriesResponse;
 	} catch {
 		return null;
 	} finally {

@@ -101,6 +101,23 @@ export type AnimeDbAnimeResponse = {
 	filters: Record<string, string | number | null | undefined>;
 };
 
+export type MissingEntrySource = {
+	animeId: number;
+	title: string;
+	relationType: string;
+	relationLabel: string;
+};
+
+export type MissingEntry = {
+	anime: AnimeDbEntry;
+	sources: MissingEntrySource[];
+};
+
+export type MissingEntriesResponse = {
+	count: number;
+	data: MissingEntry[];
+};
+
 export type AnimeDbFilters = {
 	q?: string;
 	sort?: string;

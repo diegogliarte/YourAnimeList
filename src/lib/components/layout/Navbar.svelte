@@ -6,6 +6,7 @@
 
 	const tabs = [
 		{ label: 'List', href: '/list' },
+		{ label: 'Missing entries', href: '/missing-entries' },
 		{ label: 'Stats', href: '/stats' },
 		{ label: 'Top Anime', href: '/top-anime' },
 		{ label: 'Franchises', href: '/franchises' },
