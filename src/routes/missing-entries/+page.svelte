@@ -1,16 +1,15 @@
 <script lang="ts">
-	import AnimeTable, {
-		type AnimeTableAnime,
-		type AnimeTableExtraColumn
-	} from '$lib/components/ui/AnimeTable.svelte';
 	import Button from '$lib/components/ui/Button.svelte';
 	import Panel from '$lib/components/ui/Panel.svelte';
 	import { animeData } from '$lib/stores/anime-data.svelte';
 	import type { MissingEntry } from '$lib/types/anime-db';
+	import { getAnimeUrl } from '$lib/utils/anime.utils';
+	import { formatLabel } from '$lib/utils/format.utils';
 
 	type MissingEntriesGroup = {
 		animeId: number;
 		title: string;
+		imageUrl: string | null;
 		entries: MissingEntry[];
 	};
 
@@ -18,12 +17,22 @@
 
 	const groups = $derived.by(() => {
 		const groupsBySourceId = new Map<number, MissingEntriesGroup>();
+		const completedEntriesById = new Map(
+			animeData.userList
+				.filter((entry) => entry.list_status.status === 'completed')
+				.map((entry) => [entry.node.id, entry])
+		);
 
 		for (const entry of animeData.missingEntries) {
 			for (const source of entry.sources) {
+				const completedEntry = completedEntriesById.get(source.animeId);
 				const group = groupsBySourceId.get(source.animeId) ?? {
 					animeId: source.animeId,
 					title: source.title,
+					imageUrl:
+						completedEntry?.node.main_picture?.medium ??
+						completedEntry?.node.main_picture?.large ??
+						null,
 					entries: []
 				};
 
@@ -57,17 +66,7 @@
 			: [...expandedSourceIds, animeId];
 	}
 
-	function getAnimeId(item: AnimeTableAnime) {
-		return 'node' in item ? item.node.id : item.id;
-	}
-
-	function getEntry(group: MissingEntriesGroup, item: AnimeTableAnime) {
-		return group.entries.find((entry) => entry.anime.id === getAnimeId(item));
-	}
-
-	function getRelationLabels(entry: MissingEntry | undefined, sourceAnimeId: number) {
-		if (!entry) return null;
-
+	function getRelationLabels(entry: MissingEntry, sourceAnimeId: number) {
 		return [
 			...new Set(
 				entry.sources
@@ -77,16 +76,20 @@
 		].join(', ');
 	}
 
-	function getExtraColumns(group: MissingEntriesGroup): AnimeTableExtraColumn[] {
+	function getMissingImageUrl(entry: MissingEntry) {
+		return entry.anime.mainPicture?.medium ?? entry.anime.mainPicture?.large ?? null;
+	}
+
+	function getMissingMeta(entry: MissingEntry) {
+		const year = entry.anime.startSeason?.year ?? entry.anime.startDate?.slice(0, 4);
+
 		return [
-			{
-				label: 'Relation',
-				value: 'direct_relation',
-				width: '10rem',
-				getCell: (item) => getRelationLabels(getEntry(group, item), group.animeId),
-				getSort: (item) => getRelationLabels(getEntry(group, item), group.animeId)
-			}
-		];
+			entry.anime.mediaType ? formatLabel(entry.anime.mediaType) : null,
+			year || null,
+			entry.anime.numEpisodes ? `${entry.anime.numEpisodes} eps` : null
+		]
+			.filter(Boolean)
+			.join(' · ');
 	}
 </script>
 
@@ -122,26 +125,63 @@
 				<section class="overflow-hidden rounded-md border border-border bg-surface">
 					<button
 						type="button"
-						class="flex w-full cursor-pointer items-center justify-between gap-3 p-3 text-left transition hover:bg-surface-soft"
+						class="flex w-full cursor-pointer items-center gap-3 p-2 text-left transition hover:bg-surface-soft"
 						onclick={() => toggleSource(group.animeId)}
 						aria-expanded={expanded}
 					>
-						<span class="min-w-0 truncate text-sm font-semibold text-text">{group.title}</span>
-						<span class="shrink-0 text-xs text-text-muted">
-							{group.entries.length} missing · {expanded ? 'Hide' : 'Show'}
+						{#if group.imageUrl}
+							<img
+								src={group.imageUrl}
+								alt={group.title}
+								class="h-20 w-14 shrink-0 rounded object-cover"
+							/>
+						{:else}
+							<span class="h-20 w-14 shrink-0 rounded bg-surface-soft"></span>
+						{/if}
+
+						<span class="min-w-0 flex-1">
+							<span class="block truncate text-sm font-semibold text-text">{group.title}</span>
+							<span class="mt-1 block text-xs text-text-muted">
+								{group.entries.length} missing direct
+								{group.entries.length === 1 ? 'entry' : 'entries'}
+							</span>
+						</span>
+
+						<span class="shrink-0 text-xs font-medium text-primary">
+							{expanded ? 'Hide' : 'Show'}
 						</span>
 					</button>
 
 					{#if expanded}
-						<div class="border-t border-border">
-							<AnimeTable
-								items={group.entries.map((entry) => entry.anime)}
-								extraColumns={getExtraColumns(group)}
-								filterPlaceholder={`Filter entries related to ${group.title}...`}
-								defaultSort="direct_relation"
-								defaultDirection="asc"
-								class="rounded-none border-0"
-							/>
+						<div class="grid gap-2 border-t border-border bg-background/40 p-2 sm:grid-cols-2 lg:grid-cols-3">
+							{#each group.entries as entry (entry.anime.id)}
+								<a
+									href={getAnimeUrl(entry.anime.id)}
+									target="_blank"
+									rel="noreferrer"
+									class="group flex min-w-0 gap-2 rounded-md border border-border bg-surface p-2 transition hover:border-primary/70 hover:bg-surface-soft"
+								>
+									{#if getMissingImageUrl(entry)}
+										<img
+											src={getMissingImageUrl(entry)}
+											alt={entry.anime.title}
+											class="h-18 w-12 shrink-0 rounded object-cover"
+										/>
+									{:else}
+										<span class="h-18 w-12 shrink-0 rounded bg-surface-soft"></span>
+									{/if}
+
+									<span class="min-w-0 flex-1">
+										<span class="line-clamp-2 text-sm font-medium text-text group-hover:text-primary">
+											{entry.anime.title}
+										</span>
+										<span class="mt-1 block text-xs text-text-muted">{getMissingMeta(entry)}</span>
+										<span class="mt-2 block text-xs text-primary">
+											{getRelationLabels(entry, group.animeId)}
+										</span>
+									</span>
+								</a>
+							{/each}
 						</div>
 					{/if}
 				</section>
